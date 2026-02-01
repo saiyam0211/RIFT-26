@@ -82,9 +82,8 @@ type RSVPRequest struct {
 }
 
 type TeamMemberUpdate struct {
-	ID         uuid.UUID `json:"id"`
-	Name       string    `json:"name" binding:"required"`
-	Email      string    `json:"email" binding:"required,email"`
-	Phone      string    `json:"phone" binding:"required,len=10"`
-	TShirtSize string    `json:"tshirt_size" binding:"required,oneof=XS S M L XL XXL"`
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name" binding:"required"`
+	Email string    `json:"email" binding:"required,email"`
+	Phone string    `json:"phone" binding:"required,len=10"`
 }

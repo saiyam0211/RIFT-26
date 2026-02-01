@@ -49,7 +49,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	teamHandler := handlers.NewTeamHandler(teamService)
+	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret)
 	volunteerHandler := handlers.NewVolunteerHandler(checkinService)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 

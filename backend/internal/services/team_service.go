@@ -116,7 +116,6 @@ func (s *TeamService) SubmitRSVP(ctx context.Context, teamID uuid.UUID, city mod
 				existingMember.Name = update.Name
 				existingMember.Email = update.Email
 				existingMember.Phone = update.Phone
-				existingMember.TShirtSize = &update.TShirtSize
 				updatedMembers = append(updatedMembers, existingMember)
 				found = true
 				break

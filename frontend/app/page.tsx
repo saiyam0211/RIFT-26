@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
-import { setAuth } from '@/lib/auth';
+import { useAuthStore } from '@/store/auth-store';
 
 interface Team {
     id: string;
@@ -20,6 +20,7 @@ interface Team {
 
 export default function Home() {
     const router = useRouter();
+    const { setAuth } = useAuthStore();
     const [step, setStep] = useState<'search' | 'otp' | 'verifying'>('search');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Team[]>([]);
@@ -31,6 +32,7 @@ export default function Home() {
     const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isRSVPLocked, setIsRSVPLocked] = useState(false);
 
     // Debounced autocomplete
     useEffect(() => {
@@ -101,6 +103,8 @@ export default function Home() {
         setSearchQuery(team.team_name);
         setShowSuggestions(false);
         setStep('otp');
+        // Check RSVP status
+        setIsRSVPLocked(team.rsvp_locked || false);
     };
 
     const handleSuggestionClick = (team: Team) => {
@@ -132,6 +136,17 @@ export default function Home() {
                 team_id: selectedTeam.id,
                 last_4_digits: phoneNumber
             });
+
+            // Check if RSVP is already done
+            if (verifyResponse.data.rsvp_locked && verifyResponse.data.token) {
+                // Direct login - RSVP already completed
+                console.log('RSVP already completed. Logging in directly...');
+                setAuth(verifyResponse.data.token, verifyResponse.data.team);
+
+                // Redirect to dashboard
+                router.push(`/dashboard/${verifyResponse.data.dashboard_token}`);
+                return;
+            }
 
             const fullPhoneNumber = verifyResponse.data.phone_number;
 
@@ -174,14 +189,21 @@ export default function Home() {
                 team_id: selectedTeam?.id,
             });
 
+            console.log('Verification successful:', response.data);
+
             // Save auth data
             setAuth(response.data.token, response.data.team);
 
             // Redirect based on RSVP status
-            if (response.data.team.rsvp_locked) {
-                router.push(`/dashboard/${response.data.team.dashboard_token}`);
+            const team = response.data.team;
+            console.log('Team status:', team.status, 'RSVP locked:', team.rsvp_locked);
+
+            if (team.rsvp_locked && team.dashboard_token) {
+                console.log('Redirecting to dashboard:', `/dashboard/${team.dashboard_token}`);
+                router.push(`/dashboard/${team.dashboard_token}`);
             } else {
-                router.push(`/rsvp/${response.data.team.id}`);
+                console.log('Redirecting to RSVP:', `/rsvp/${team.id}`);
+                router.push(`/rsvp/${team.id}`);
             }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to verify OTP');
@@ -340,7 +362,7 @@ export default function Home() {
                                 disabled={loading || phoneNumber.length !== 4}
                                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {loading ? 'Verifying...' : 'Send OTP'}
+                                {loading ? 'Verifying...' : (isRSVPLocked ? 'Go to Dashboard' : 'Send OTP')}
                             </button>
 
                             {/* reCAPTCHA Container - Now visible */}
