@@ -66,6 +66,7 @@ func (s *TeamService) SearchTeams(ctx context.Context, query string) ([]models.T
 			City:        team.City,
 			Status:      team.Status,
 			MemberCount: team.MemberCount, // Use count from database
+			RSVPLocked:  team.RSVPLocked,  // Include RSVP lock status
 		})
 	}
 

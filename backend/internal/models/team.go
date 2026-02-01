@@ -74,6 +74,7 @@ type TeamSearchResponse struct {
 	City        *City      `json:"city"`
 	Status      TeamStatus `json:"status"`
 	MemberCount int        `json:"member_count"`
+	RSVPLocked  bool       `json:"rsvp_locked"`
 }
 
 type RSVPRequest struct {

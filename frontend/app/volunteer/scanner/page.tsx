@@ -4,12 +4,8 @@ import { useState, useEffect } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import apiClient from '@/lib/api-client'
 import { Team } from '@/types'
-import { useAuthStore } from '@/store/auth-store'
-import { useRouter } from 'next/navigation'
 
 export default function VolunteerScannerPage() {
-    const router = useRouter()
-    const { isAuthenticated } = useAuthStore()
     const [scannedTeam, setScannedTeam] = useState<Team | null>(null)
     const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false)
     const [checkedInAt, setCheckedInAt] = useState<string | null>(null)
@@ -19,11 +15,6 @@ export default function VolunteerScannerPage() {
     const [processing, setProcessing] = useState(false)
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            router.push('/')
-            return
-        }
-
         // Initialize QR scanner
         const scanner = new Html5QrcodeScanner(
             'qr-reader',

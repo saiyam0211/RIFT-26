@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import axios from 'axios'
-import { QRCodeSVG } from 'react-qr-code'
+import QRCode from 'react-qr-code'
 import { Team, Announcement } from '@/types'
 
 export default function DashboardPage() {
@@ -119,7 +119,7 @@ export default function DashboardPage() {
                                 <div className="flex-shrink-0">
                                     {showQR ? (
                                         <div className="bg-white p-4 rounded-lg shadow-lg">
-                                            <QRCodeSVG value={qrCodeData} size={200} level="H" />
+                                            <QRCode value={qrCodeData} size={200} level="H" />
                                         </div>
                                     ) : (
                                         <div className="bg-white p-8 rounded-lg shadow-lg w-52 h-52 flex items-center justify-center">
