@@ -70,7 +70,7 @@ type TeamSearchResponse struct {
 	ID          uuid.UUID  `json:"id"`
 	TeamName    string     `json:"team_name"`
 	LeaderName  string     `json:"leader_name"`
-	MaskedPhone string     `json:"masked_phone"`
+	MaskedEmail string     `json:"masked_email"`
 	City        *City      `json:"city"`
 	Status      TeamStatus `json:"status"`
 	MemberCount int        `json:"member_count"`

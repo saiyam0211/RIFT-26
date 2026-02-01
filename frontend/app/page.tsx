@@ -3,15 +3,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { useAuthStore } from '@/store/auth-store';
 import RIFTBackground from '@/components/RIFTBackground';
 
 interface Team {
     id: string;
     team_name: string;
-    masked_phone: string;
+    masked_email: string;
     city: string | null;
     status: string;
     member_count: number;
@@ -22,14 +20,13 @@ interface Team {
 export default function Home() {
     const router = useRouter();
     const { setAuth } = useAuthStore();
-    const [step, setStep] = useState<'search' | 'otp' | 'verifying'>('search');
+    const [step, setStep] = useState<'search' | 'email' | 'verifying'>('search');
     const [searchQuery, setSearchQuery] = useState('');
     const [suggestions, setSuggestions] = useState<Team[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-    const [phoneNumber, setPhoneNumber] = useState('');
+    const [email, setEmail] = useState('');
     const [otpCode, setOtpCode] = useState('');
-    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [searchingTeams, setSearchingTeams] = useState(false);
     const [error, setError] = useState('');
@@ -64,33 +61,20 @@ export default function Home() {
 
     const handleTeamSelect = (team: Team) => {
         setSelectedTeam(team);
-        setPhoneNumber('');
+        setEmail('');
         setSearchQuery(team.team_name);
         setShowSuggestions(false);
-        setStep('otp');
+        setStep('email');
         setIsRSVPLocked(team.rsvp_locked || false);
-    };
-
-    const setupRecaptcha = () => {
-        if (!(window as any).recaptchaVerifier) {
-            (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                size: 'normal',
-                callback: () => console.log('reCAPTCHA resolved'),
-            });
-        }
     };
 
     const handleSendOTP = async () => {
         if (!selectedTeam) return;
 
-        if (phoneNumber.length !== 4) {
-            setError('Please enter the last 4 digits of the team leader\'s phone number');
-            return;
-        }
-
-        const maskedLast4 = selectedTeam.masked_phone.slice(-4);
-        if (phoneNumber !== maskedLast4) {
-            setError('Last 4 digits do not match. Please check and try again.');
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Please enter a valid email address');
             return;
         }
 
@@ -98,23 +82,12 @@ export default function Home() {
         setError('');
 
         try {
-            const verifyResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/teams/verify-phone`, {
+            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/send-email-otp`, {
                 team_id: selectedTeam.id,
-                last_4_digits: phoneNumber
+                email: email
             });
 
-            if (verifyResponse.data.rsvp_locked && verifyResponse.data.token) {
-                console.log('RSVP already completed. Logging in directly...');
-                setAuth(verifyResponse.data.token, verifyResponse.data.team);
-                router.push(`/dashboard/${verifyResponse.data.dashboard_token}`);
-                return;
-            }
-
-            const fullPhoneNumber = verifyResponse.data.phone_number;
-            setupRecaptcha();
-            const formattedPhone = `+91${fullPhoneNumber}`;
-            const confirmation = await signInWithPhoneNumber(auth, formattedPhone, (window as any).recaptchaVerifier);
-            setConfirmationResult(confirmation);
+            console.log('OTP sent successfully:', response.data.message);
             setStep('verifying');
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to send OTP');
@@ -125,18 +98,16 @@ export default function Home() {
     };
 
     const handleVerifyOTP = async (otpCode: string) => {
-        if (!confirmationResult) return;
+        if (!selectedTeam) return;
 
         setLoading(true);
         setError('');
 
         try {
-            const result = await confirmationResult.confirm(otpCode);
-            const idToken = await result.user.getIdToken();
-
-            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-firebase`, {
-                id_token: idToken,
-                team_id: selectedTeam?.id,
+            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-email-otp`, {
+                team_id: selectedTeam.id,
+                email: email,
+                otp_code: otpCode,
             });
 
             setAuth(response.data.token, response.data.team);
@@ -159,8 +130,8 @@ export default function Home() {
     const getStepInfo = () => {
         if (step === 'search') {
             return { number: 1, text: 'Search Team' };
-        } else if (step === 'otp') {
-            return { number: 2, text: 'Verify Phone' };
+        } else if (step === 'email') {
+            return { number: 2, text: 'Verify Email' };
         } else {
             return { number: 3, text: 'Verify OTP' };
         }
@@ -285,25 +256,24 @@ export default function Home() {
                         </div>
                     )}
 
-                    {/* OTP Step */}
-                    {step === 'otp' && selectedTeam && (
+                    {/* Email Input Step */}
+                    {step === 'email' && (
                         <div className="space-y-6">
                             <button
-                                onClick={() => {
-                                    setStep('search');
-                                    setSelectedTeam(null);
-                                    setSearchQuery('');
-                                }}
+                                onClick={() => setStep('search')}
                                 className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
                             >
-                                ← Back to search
+                                ← Back
                             </button>
 
-                            {/* <div className="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/20">
-                                <h3 className="text-white text-xl font-semibold mb-2">{selectedTeam.team_name}</h3>
-                                <p className="text-gray-400 text-sm mb-4">Leader: {selectedTeam.leader_name}</p>
-                                <p className="text-gray-400 text-sm">Phone: {selectedTeam.masked_phone}</p>
-                            </div> */}
+                            <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
+                                <p className="text-blue-200 text-sm">
+                                    Team: <strong>{selectedTeam?.team_name}</strong>
+                                </p>
+                                <p className="text-blue-200/80 text-xs mt-1">
+                                    Leader Email: {selectedTeam?.masked_email}
+                                </p>
+                            </div>
 
                             {error && (
                                 <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
@@ -312,34 +282,28 @@ export default function Home() {
                             )}
 
                             <div>
-                                <label className="block text-gray-300 text-sm font-medium mb-2 text-center">
-                                    Enter Last 4 Digits of Team Leader's Phone Number
+                                <label className="block text-gray-300 text-sm font-medium mb-4 text-center mt-10">
+                                    Enter Team Leader's Email Address
                                 </label>
-                                <div className="input-container max-w-32 mx-auto">
+                                <div className="input-container">
                                     <input
-                                        type="tel"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        maxLength={4}
-                                        value={phoneNumber}
-                                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="****"
-                                        autoComplete="off"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="youremail@example.com"
+                                        autoComplete="email"
                                         className="text-center"
-                                        style={{ letterSpacing: '0.5em' }}
                                     />
                                 </div>
                             </div>
 
                             <button
                                 onClick={handleSendOTP}
-                                disabled={loading || phoneNumber.length !== 4}
+                                disabled={loading || !email}
                                 className="w-full bg-[#c0211f] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {loading ? 'Processing...' : (isRSVPLocked ? 'Go to Dashboard' : 'Send OTP')}
+                                {loading ? 'Sending...' : 'Send OTP'}
                             </button>
-
-                            <div id="recaptcha-container"></div>
                         </div>
                     )}
 
@@ -347,7 +311,7 @@ export default function Home() {
                     {step === 'verifying' && (
                         <div className="space-y-6">
                             <button
-                                onClick={() => setStep('otp')}
+                                onClick={() => setStep('email')}
                                 className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
                             >
                                 ← Back
@@ -355,7 +319,7 @@ export default function Home() {
 
                             <div className="bg-green-500/20 border border-green-500/50 p-4 rounded-lg">
                                 <p className="text-green-200 text-sm">
-                                    ✓ OTP sent to {selectedTeam?.masked_phone}
+                                    ✓ OTP sent to {email}
                                 </p>
                             </div>
 

@@ -6,7 +6,6 @@ import (
 	"github.com/rift26/backend/internal/middleware"
 	"github.com/rift26/backend/internal/models"
 	"github.com/rift26/backend/internal/services"
-	"github.com/rift26/backend/internal/utils"
 )
 
 type TeamHandler struct {
@@ -112,65 +111,4 @@ func (h *TeamHandler) GetDashboard(c *gin.Context) {
 		"announcements": announcements,
 		"qr_code":       qrCode,
 	})
-}
-
-// VerifyPhone verifies last 4 digits of team leader's phone and returns full number
-// If team RSVP is locked, also generates JWT token for direct dashboard access
-// POST /api/v1/teams/verify-phone
-func (h *TeamHandler) VerifyPhone(c *gin.Context) {
-	var req struct {
-		TeamID      string `json:"team_id" binding:"required"`
-		Last4Digits string `json:"last_4_digits" binding:"required,len=4"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request. Please provide team_id and last_4_digits"})
-		return
-	}
-
-	teamID, err := uuid.Parse(req.TeamID)
-	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid team ID"})
-		return
-	}
-
-	// Verify last 4 digits
-	phoneNumber, err := h.teamService.VerifyAndGetLeaderPhone(c.Request.Context(), teamID, req.Last4Digits)
-	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get team to check RSVP status
-	team, err := h.teamService.GetTeamByID(c.Request.Context(), teamID)
-	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to get team details"})
-		return
-	}
-
-	response := gin.H{
-		"phone_number":    phoneNumber,
-		"message":         "Phone number verified successfully",
-		"rsvp_locked":     team.RSVPLocked,
-		"dashboard_token": team.DashboardToken,
-	}
-
-	// If RSVP is locked, generate JWT token for direct access
-	if team.RSVPLocked && team.DashboardToken != nil {
-		token, err := utils.GenerateJWT(
-			teamID,
-			"",
-			models.UserRoleParticipant,
-			&teamID,
-			h.jwtSecret,
-		)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "Failed to generate access token"})
-			return
-		}
-		response["token"] = token
-		response["team"] = team
-	}
-
-	c.JSON(200, response)
 }

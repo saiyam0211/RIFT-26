@@ -12,7 +12,7 @@ import (
 	"github.com/rift26/backend/internal/middleware"
 	"github.com/rift26/backend/internal/repository"
 	"github.com/rift26/backend/internal/services"
-	"github.com/rift26/backend/pkg/auth"
+	"github.com/rift26/backend/pkg/email"
 )
 
 func main() {
@@ -30,26 +30,31 @@ func main() {
 	defer db.Close()
 	log.Println("✅ Connected to PostgreSQL")
 
-	// Initialize Firebase Auth
-	firebaseAuth, err := auth.NewFirebaseAuthService(cfg.FirebaseCredentials)
-	if err != nil {
-		log.Fatalf("Failed to initialize Firebase Auth: %v", err)
-	}
-	log.Println("✅ Firebase Auth initialized")
+	// Initialize Email Service
+	emailService := email.NewEmailService(
+		cfg.SMTPHost,
+		cfg.SMTPPort,
+		cfg.SMTPUsername,
+		cfg.SMTPPassword,
+		cfg.SMTPFromEmail,
+		cfg.SMTPFromName,
+	)
+	log.Println("✅ Email service initialized")
 
 	// Initialize repositories
 	teamRepo := repository.NewTeamRepository(db)
 	announcementRepo := repository.NewAnnouncementRepository(db)
+	otpRepo := repository.NewOTPRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
 	// Initialize services
-	authService := services.NewAuthService(teamRepo, firebaseAuth, cfg.JWTSecret)
 	teamService := services.NewTeamService(teamRepo, announcementRepo)
 	checkinService := services.NewCheckinService(teamRepo)
+	emailOTPService := services.NewEmailOTPService(otpRepo, teamRepo, emailService, cfg.JWTSecret)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService)
 	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret)
+	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService)
 	volunteerHandler := handlers.NewVolunteerHandler(checkinService)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 
@@ -87,7 +92,6 @@ func main() {
 		teams := v1.Group("/teams")
 		{
 			teams.GET("/search", teamHandler.SearchTeams)
-			teams.POST("/verify-phone", teamHandler.VerifyPhone)
 			teams.GET("/:id", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.GetTeam)
 			teams.PUT("/:id/rsvp", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP)
 		}
@@ -95,10 +99,11 @@ func main() {
 		// Dashboard route (public via token)
 		v1.GET("/dashboard/:token", teamHandler.GetDashboard)
 
-		// Auth routes
+		// Auth routes (email OTP)
 		authRoutes := v1.Group("/auth")
 		{
-			authRoutes.POST("/verify-firebase", middleware.RateLimitMiddleware(5, 1*time.Minute), authHandler.VerifyFirebase)
+			authRoutes.POST("/send-email-otp", middleware.RateLimitMiddleware(5, 1*time.Minute), emailOTPHandler.SendEmailOTP)
+			authRoutes.POST("/verify-email-otp", middleware.RateLimitMiddleware(5, 1*time.Minute), emailOTPHandler.VerifyEmailOTP)
 		}
 
 		// Volunteer routes (protected)
@@ -139,7 +144,8 @@ func main() {
 	log.Println("   GET  /api/v1/teams/:id (auth)")
 	log.Println("   PUT  /api/v1/teams/:id/rsvp (auth)")
 	log.Println("   GET  /api/v1/dashboard/:token")
-	log.Println("   POST /api/v1/auth/verify-firebase")
+	log.Println("   POST /api/v1/auth/send-email-otp")
+	log.Println("   POST /api/v1/auth/verify-email-otp")
 	log.Println("   POST /api/v1/checkin/scan (volunteer)")
 	log.Println("   POST /api/v1/checkin/confirm (volunteer)")
 	log.Println("   POST /api/v1/admin/teams/bulk-upload (admin)")

@@ -31,3 +31,36 @@ func ValidatePhone(phone string) bool {
 	}
 	return true
 }
+
+// MaskEmail masks an email address for privacy
+// Example: john.doe@example.com -> jo***@example.com
+func MaskEmail(email string) string {
+	if email == "" {
+		return ""
+	}
+
+	// Find @ symbol
+	atIndex := -1
+	for i, char := range email {
+		if char == '@' {
+			atIndex = i
+			break
+		}
+	}
+
+	if atIndex == -1 {
+		return email // Return as-is if invalid format
+	}
+
+	localPart := email[:atIndex]
+	domain := email[atIndex:]
+
+	// Show first 2 characters of local part
+	visibleChars := 2
+	if len(localPart) <= visibleChars {
+		return email // Too short to mask effectively
+	}
+
+	maskedLocal := localPart[:visibleChars] + "***"
+	return maskedLocal + domain
+}

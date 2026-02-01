@@ -19,10 +19,11 @@ type FirebaseAuthResponse struct {
 	PhoneNumber string `json:"phone_number"`
 }
 
-// Note: OTP model is kept for potential future use or fallback mechanism
+// OTP model for email-based OTP authentication
 type OTP struct {
 	ID        uuid.UUID  `json:"id" db:"id"`
-	Phone     string     `json:"phone" db:"phone"`
+	Phone     *string    `json:"phone,omitempty" db:"phone"` // Optional, for backward compatibility
+	Email     *string    `json:"email,omitempty" db:"email"` // Email for email-based OTP
 	OTPCode   string     `json:"otp_code" db:"otp_code"`
 	TeamID    *uuid.UUID `json:"team_id" db:"team_id"`
 	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`

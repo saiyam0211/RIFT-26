@@ -20,8 +20,8 @@ func NewOTPRepository(db *database.DB) *OTPRepository {
 	return &OTPRepository{db: db}
 }
 
-// CreateOTP generates and stores a new OTP
-func (r *OTPRepository) CreateOTP(ctx context.Context, phone string, teamID uuid.UUID) (*models.OTP, error) {
+// CreateOTP generates and stores a new OTP for email
+func (r *OTPRepository) CreateOTP(ctx context.Context, email string, teamID uuid.UUID) (*models.OTP, error) {
 	// Generate 6-digit OTP
 	otpCode := fmt.Sprintf("%06d", rand.Intn(1000000))
 
@@ -29,14 +29,14 @@ func (r *OTPRepository) CreateOTP(ctx context.Context, phone string, teamID uuid
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	query := `
-		INSERT INTO otps (phone, otp_code, team_id, expires_at)
+		INSERT INTO otps (email, otp_code, team_id, expires_at)
 		VALUES ($1, $2, $3, $4)
-		RETURNING id, phone, otp_code, team_id, expires_at, verified, created_at
+		RETURNING id, email, otp_code, team_id, expires_at, verified, created_at
 	`
 
 	var otp models.OTP
-	err := r.db.QueryRowContext(ctx, query, phone, otpCode, teamID, expiresAt).Scan(
-		&otp.ID, &otp.Phone, &otp.OTPCode, &otp.TeamID,
+	err := r.db.QueryRowContext(ctx, query, email, otpCode, teamID, expiresAt).Scan(
+		&otp.ID, &otp.Email, &otp.OTPCode, &otp.TeamID,
 		&otp.ExpiresAt, &otp.Verified, &otp.CreatedAt,
 	)
 	if err != nil {
@@ -46,12 +46,12 @@ func (r *OTPRepository) CreateOTP(ctx context.Context, phone string, teamID uuid
 	return &otp, nil
 }
 
-// VerifyOTP validates an OTP code
-func (r *OTPRepository) VerifyOTP(ctx context.Context, phone, otpCode string, teamID uuid.UUID) (bool, error) {
+// VerifyOTP validates an OTP code for email
+func (r *OTPRepository) VerifyOTP(ctx context.Context, email, otpCode string, teamID uuid.UUID) (bool, error) {
 	query := `
 		SELECT id, expires_at, verified
 		FROM otps
-		WHERE phone = $1 AND otp_code = $2 AND team_id = $3
+		WHERE email = $1 AND otp_code = $2 AND team_id = $3
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
@@ -60,7 +60,7 @@ func (r *OTPRepository) VerifyOTP(ctx context.Context, phone, otpCode string, te
 	var expiresAt time.Time
 	var verified bool
 
-	err := r.db.QueryRowContext(ctx, query, phone, otpCode, teamID).Scan(&id, &expiresAt, &verified)
+	err := r.db.QueryRowContext(ctx, query, email, otpCode, teamID).Scan(&id, &expiresAt, &verified)
 	if err == sql.ErrNoRows {
 		return false, nil // OTP not found
 	}
@@ -87,18 +87,18 @@ func (r *OTPRepository) VerifyOTP(ctx context.Context, phone, otpCode string, te
 	return true, nil
 }
 
-// IsRateLimited checks if a phone number has exceeded OTP request limits
-func (r *OTPRepository) IsRateLimited(ctx context.Context, phone string) (bool, error) {
+// IsRateLimited checks if an email has exceeded OTP request limits
+func (r *OTPRepository) IsRateLimited(ctx context.Context, email string) (bool, error) {
 	// Allow max 3 OTP requests per hour
 	oneHourAgo := time.Now().Add(-1 * time.Hour)
 
 	query := `
 		SELECT COUNT(*) FROM otps
-		WHERE phone = $1 AND created_at > $2
+		WHERE email = $1 AND created_at > $2
 	`
 
 	var count int
-	err := r.db.QueryRowContext(ctx, query, phone, oneHourAgo).Scan(&count)
+	err := r.db.QueryRowContext(ctx, query, email, oneHourAgo).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check rate limit: %w", err)
 	}

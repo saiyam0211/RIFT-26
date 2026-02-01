@@ -7,14 +7,18 @@ services:
       DATABASE_URL: "${DATABASE_URL}"
       PORT: "8080"
       JWT_SECRET: "${JWT_SECRET}"
-      FIREBASE_CREDENTIALS_PATH: "/root/firebase-credentials.json"
+      SMTP_HOST: "${SMTP_HOST}"
+      SMTP_PORT: "${SMTP_PORT}"
+      SMTP_USERNAME: "${SMTP_USERNAME}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD}"
+      SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL}"
+      SMTP_FROM_NAME: "${SMTP_FROM_NAME}"
       ENVIRONMENT: "development"
       ALLOWED_ORIGINS: "http://localhost:3000"
     ports:
       - "0.0.0.0:8080:8080"
     volumes:
       - ./backend:/app
-      - ./firebase-credentials.json:/root/firebase-credentials.json:ro
     restart: unless-stopped
     networks:
       - rift_network

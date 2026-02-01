@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/models"
@@ -26,7 +27,7 @@ func NewTeamService(
 	}
 }
 
-// SearchTeams performs fuzzy search and returns masked phone numbers with leader details
+// SearchTeams performs fuzzy search and returns masked emails with leader details
 func (s *TeamService) SearchTeams(ctx context.Context, query string) ([]models.TeamSearchResponse, error) {
 	teams, err := s.teamRepo.SearchByName(ctx, query)
 	if err != nil {
@@ -43,11 +44,11 @@ func (s *TeamService) SearchTeams(ctx context.Context, query string) ([]models.T
 
 		// Find leader
 		var leaderName string
-		var leaderPhone string
+		var leaderEmail string
 		for _, member := range members {
 			if member.Role == "leader" {
 				leaderName = member.Name
-				leaderPhone = member.Phone
+				leaderEmail = member.Email
 				break
 			}
 		}
@@ -55,14 +56,14 @@ func (s *TeamService) SearchTeams(ctx context.Context, query string) ([]models.T
 		// If no leader found, use first member
 		if leaderName == "" && len(members) > 0 {
 			leaderName = members[0].Name
-			leaderPhone = members[0].Phone
+			leaderEmail = members[0].Email
 		}
 
 		results = append(results, models.TeamSearchResponse{
 			ID:          team.ID,
 			TeamName:    team.TeamName,
 			LeaderName:  leaderName,
-			MaskedPhone: utils.MaskPhone(leaderPhone),
+			MaskedEmail: utils.MaskEmail(leaderEmail),
 			City:        team.City,
 			Status:      team.Status,
 			MemberCount: team.MemberCount, // Use count from database
@@ -166,8 +167,8 @@ func (s *TeamService) GetDashboard(ctx context.Context, token string) (*models.T
 	return team, announcements, qrCodeDataURL, nil
 }
 
-// VerifyAndGetLeaderPhone verifies last 4 digits and returns full leader phone number
-func (s *TeamService) VerifyAndGetLeaderPhone(ctx context.Context, teamID uuid.UUID, last4Digits string) (string, error) {
+// VerifyAndGetLeaderEmail verifies email matches team leader and returns leader email
+func (s *TeamService) VerifyAndGetLeaderEmail(ctx context.Context, teamID uuid.UUID, email string) (string, error) {
 	// Get team members
 	members, err := s.teamRepo.GetMembersByTeamID(ctx, teamID)
 	if err != nil {
@@ -179,28 +180,23 @@ func (s *TeamService) VerifyAndGetLeaderPhone(ctx context.Context, teamID uuid.U
 	}
 
 	// Find team leader
-	var leaderPhone string
+	var leaderEmail string
 	for _, member := range members {
 		if member.Role == "leader" {
-			leaderPhone = member.Phone
+			leaderEmail = member.Email
 			break
 		}
 	}
 
 	// If no explicit leader, use first member
-	if leaderPhone == "" {
-		leaderPhone = members[0].Phone
+	if leaderEmail == "" {
+		leaderEmail = members[0].Email
 	}
 
-	// Verify last 4 digits
-	if len(leaderPhone) < 4 {
-		return "", fmt.Errorf("invalid phone number format")
+	// Verify email matches (case-insensitive)
+	if !strings.EqualFold(leaderEmail, email) {
+		return "", fmt.Errorf("email verification failed: email does not match team leader's email")
 	}
 
-	actualLast4 := leaderPhone[len(leaderPhone)-4:]
-	if actualLast4 != last4Digits {
-		return "", fmt.Errorf("phone number verification failed")
-	}
-
-	return leaderPhone, nil
+	return leaderEmail, nil
 }
