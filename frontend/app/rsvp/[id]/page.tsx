@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth-store'
 import apiClient from '@/lib/api-client'
 import { Team, RSVPSubmission } from '@/types'
 import RIFTBackground from '@/components/RIFTBackground'
+import CustomLoader from '@/components/CustomLoader'
 
 const CITIES = [
     { value: 'BLR' as const, label: 'Bangalore' },
@@ -132,10 +133,7 @@ export default function RSVPPage() {
             <div className="min-h-screen flex relative overflow-hidden">
                 <RIFTBackground />
                 <div className="flex items-center justify-center w-full">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c0211f] mx-auto"></div>
-                        <p className="mt-4 text-gray-400">Loading...</p>
-                    </div>
+                    <CustomLoader />
                 </div>
             </div>
         )

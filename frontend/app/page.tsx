@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import RIFTBackground from '@/components/RIFTBackground';
+import CustomLoader from '@/components/CustomLoader';
 
 interface Team {
     id: string;
@@ -201,21 +202,11 @@ export default function Home() {
                                     />
                                 </div>
 
-                                {/* Searching Animation - Positioned Absolutely Above */}
+
+                                {/* Loading Animation - Positioned Absolutely Above */}
                                 {searchingTeams && searchQuery.trim().length >= 2 && (
-                                    <div className="relative top-12 left-1/2 transform -translate-x-1/2 loader-wrapper z-20">
-                                        <div className="loader"></div>
-                                        <div className="letter-wrapper">
-                                            <span className="loader-letter">S</span>
-                                            <span className="loader-letter">e</span>
-                                            <span className="loader-letter">a</span>
-                                            <span className="loader-letter">r</span>
-                                            <span className="loader-letter">c</span>
-                                            <span className="loader-letter">h</span>
-                                            <span className="loader-letter">i</span>
-                                            <span className="loader-letter">n</span>
-                                            <span className="loader-letter">g</span>
-                                        </div>
+                                    <div className="relative top-12 left-1/2 transform -translate-x-1/2 z-20">
+                                        <CustomLoader />
                                     </div>
                                 )}
 
