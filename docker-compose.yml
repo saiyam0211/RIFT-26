@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: "${DATABASE_URL}"
+      PORT: "8080"
+      JWT_SECRET: "${JWT_SECRET}"
+      FIREBASE_CREDENTIALS_PATH: "/root/firebase-credentials.json"
+      ENVIRONMENT: "development"
+      ALLOWED_ORIGINS: "http://localhost:3000"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - ./firebase-credentials.json:/root/firebase-credentials.json:ro
+    restart: unless-stopped
+    networks:
+      - rift_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: rift26_frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+    networks:
+      - rift_network
+
+networks:
+  rift_network:
+    driver: bridge
