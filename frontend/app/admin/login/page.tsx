@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { setAdminToken, setAdminUser } from '@/lib/admin-auth';
+import { setAdminToken, setAdminUser } from '../../../src/lib/admin-auth';
 
 export default function AdminLogin() {
     const router = useRouter();

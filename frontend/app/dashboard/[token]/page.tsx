@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation'
 import axios from 'axios'
 import QRCode from 'react-qr-code'
 import { Team, Announcement } from '@/types'
+import RIFTBackground from '@/components/RIFTBackground'
+import RIFTLoader from '@/components/RIFTLoader'
 
 export default function DashboardPage() {
     const params = useParams()
@@ -46,10 +48,11 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading dashboard...</p>
+            <div className="min-h-screen flex items-center justify-center relative">
+                <RIFTBackground />
+                <div className="text-center z-10">
+                    <RIFTLoader />
+                    <p className="mt-4 text-white">Loading dashboard...</p>
                 </div>
             </div>
         )
@@ -57,9 +60,10 @@ export default function DashboardPage() {
 
     if (error || !team) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <p className="text-red-600 text-lg">{error || 'Dashboard not found'}</p>
+            <div className="min-h-screen flex items-center justify-center relative">
+                <RIFTBackground />
+                <div className="text-center z-10">
+                    <p className="text-red-400 text-lg">{error || 'Dashboard not found'}</p>
                 </div>
             </div>
         )
@@ -80,7 +84,8 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
+        <div className="min-h-screen py-8 px-4 relative">
+            <RIFTBackground />
             <div className="max-w-5xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-xl p-6">

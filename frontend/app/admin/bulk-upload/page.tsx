@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { getAdminToken } from '@/lib/admin-auth';
-import { BulkUploadResponse } from '@/types/admin';
+import { getAdminToken } from '../../../src/lib/admin-auth';
+import { BulkUploadResponse } from '../../../src/types/admin';
 
 interface ParsedTeamData {
     teamId: string;

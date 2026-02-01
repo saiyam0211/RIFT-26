@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { getAdminToken, getAdminUser, removeAdminToken } from '@/lib/admin-auth';
+import { getAdminToken, getAdminUser, removeAdminToken } from '../../src/lib/admin-auth';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();

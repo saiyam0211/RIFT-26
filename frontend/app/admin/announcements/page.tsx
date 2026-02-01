@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAdminToken } from '@/lib/admin-auth';
-import { Announcement } from '@/types/admin';
+import { getAdminToken } from '../../../src/lib/admin-auth';
+import { Announcement } from '../../../src/types/admin';
 
 export default function AnnouncementsPage() {
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);

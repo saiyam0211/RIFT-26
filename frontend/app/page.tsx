@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { useAuthStore } from '@/store/auth-store';
-import LightRays from '@/components/LightRays';
+import RIFTBackground from '@/components/RIFTBackground';
 
 interface Team {
     id: string;
@@ -171,22 +171,7 @@ export default function Home() {
     return (
         <div className="min-h-screen flex relative overflow-hidden">
             {/* LightRays Background */}
-            <div className="absolute inset-0 -z-10 bg-[#060010]">
-                <LightRays
-                    raysOrigin="top-left"
-                    raysColor="#c0211f"
-                    raysSpeed={1}
-                    lightSpread={0.5}
-                    rayLength={3.5}
-                    pulsating
-                    fadeDistance={1}
-                    saturation={1}
-                    followMouse
-                    mouseInfluence={0.1}
-                    noiseAmount={0}
-                    distortion={0}
-                />
-            </div>
+            <RIFTBackground />
 
             {/* Left Side - Fixed Title and Steps */}
             <div className="w-1/2 flex flex-col justify-center ml-20 px-16 py-12 fixed left-0 top-0 h-screen">

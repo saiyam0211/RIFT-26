@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAdminToken } from '@/lib/admin-auth';
-import { Team } from '@/types/admin';
+import { getAdminToken } from '../../../src/lib/admin-auth';
+import { Team } from '../../../src/types/admin';
 
 export default function TeamsPage() {
     const [teams, setTeams] = useState<Team[]>([]);
@@ -92,8 +92,8 @@ export default function TeamsPage() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${team.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                                                team.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-gray-100 text-gray-800'
+                                            team.status === 'shortlisted' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-gray-100 text-gray-800'
                                             }`}>
                                             {team.status}
                                         </span>

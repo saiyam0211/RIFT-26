@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAdminToken } from '@/lib/admin-auth';
-import { TeamStats } from '@/types/admin';
+import { getAdminToken } from '../../../src/lib/admin-auth';
+import { TeamStats } from '../../../src/types/admin';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<TeamStats | null>(null);
