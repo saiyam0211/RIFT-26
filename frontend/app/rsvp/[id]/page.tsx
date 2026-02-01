@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuthStore } from '@/store/auth-store'
 import apiClient from '@/lib/api-client'
 import { Team, RSVPSubmission } from '@/types'
+import RIFTBackground from '@/components/RIFTBackground'
 
 const CITIES = [
     { value: 'BLR' as const, label: 'Bangalore' },
@@ -13,7 +14,7 @@ const CITIES = [
     { value: 'LKO' as const, label: 'Lucknow' },
 ]
 
-type Step = 'team_edit_question' | 'team_edit' | 'city_question' | 'city_select' | 'review'
+type Step = 'edit_question' | 'edit_members' | 'city_question' | 'city_select' | 'review'
 
 export default function RSVPPage() {
     const router = useRouter()
@@ -21,7 +22,7 @@ export default function RSVPPage() {
     const teamId = params.id as string
     const { team: authTeam, isAuthenticated } = useAuthStore()
 
-    const [step, setStep] = useState<Step>('team_edit_question')
+    const [step, setStep] = useState<Step>('edit_question')
     const [team, setTeam] = useState<Team | null>(null)
     const [city, setCity] = useState<'BLR' | 'PUNE' | 'NOIDA' | 'LKO'>('BLR')
     const [members, setMembers] = useState<any[]>([])
@@ -46,7 +47,6 @@ export default function RSVPPage() {
         }
 
         setTeam(authTeam)
-        // Sort members so leader is first (leader has the phone number ending in last 4 digits used for OTP)
         const sortedMembers = authTeam.members?.map((m) => ({
             id: m.id,
             name: m.name || '',
@@ -54,13 +54,11 @@ export default function RSVPPage() {
             phone: m.phone || '',
             role: m.role || 'member',
         })).sort((a, b) => {
-            // Leader comes first (role=leader or the one with leader phone)
             if (a.role === 'leader') return -1
             if (b.role === 'leader') return 1
             return 0
         }) || []
-        setMembers(sortedMembers
-        )
+        setMembers(sortedMembers)
         setLoading(false)
     }, [teamId, authTeam, isAuthenticated, router])
 
@@ -73,7 +71,7 @@ export default function RSVPPage() {
     }
 
     const removeMember = (index: number) => {
-        if (members.length <= 2) return
+        if (members.length <= 2 || index === 0) return
         setMembers(members.filter((_, i) => i !== index))
     }
 
@@ -117,7 +115,6 @@ export default function RSVPPage() {
 
             await apiClient.put(`/teams/${teamId}/rsvp`, payload)
 
-            // Refresh team data
             const response = await apiClient.get(`/teams/${teamId}`)
             if (response.data.dashboard_token) {
                 router.push(`/dashboard/${response.data.dashboard_token}`)
@@ -132,10 +129,13 @@ export default function RSVPPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
+            <div className="min-h-screen flex relative overflow-hidden">
+                <RIFTBackground />
+                <div className="flex items-center justify-center w-full">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c0211f] mx-auto"></div>
+                        <p className="mt-4 text-gray-400">Loading...</p>
+                    </div>
                 </div>
             </div>
         )
@@ -143,247 +143,343 @@ export default function RSVPPage() {
 
     if (!team) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <p className="text-red-600">{error || 'Team not found'}</p>
+            <div className="min-h-screen flex relative overflow-hidden">
+                <RIFTBackground />
+                <div className="flex items-center justify-center w-full">
+                    <div className="text-center">
+                        <p className="text-red-400">{error || 'Team not found'}</p>
+                    </div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-            <div className="max-w-3xl mx-auto">
-                {/* Header */}
-                <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Complete Your RSVP</h1>
-                    <p className="text-gray-600">Team: {team.team_name}</p>
-                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800">
-                            ⚠️ Once submitted, your RSVP will be locked and cannot be changed.
-                        </p>
-                    </div>
-                </div>
+        <div className="min-h-screen flex relative overflow-hidden">
+            <RIFTBackground />
 
-                {/* Step 1: Ask if they want to edit team details */}
-                {step === 'team_edit_question' && (
-                    <div className="bg-white rounded-2xl shadow-xl p-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                            Do you want to change team member details?
-                        </h2>
-                        <p className="text-gray-600 mb-6">
-                            Current members: {members.length} (You can have 2-4 members including leader)
-                        </p>
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => setStep('team_edit')}
-                                className="flex-1 bg-indigo-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition"
-                            >
-                                Yes, Edit Members
-                            </button>
-                            <button
-                                onClick={() => setStep('city_question')}
-                                className="flex-1 bg-gray-200 text-gray-800 py-4 rounded-lg font-semibold text-lg hover:bg-gray-300 transition"
-                            >
-                                No, Keep Current
-                            </button>
+            {/* Left Side - Fixed Title and Steps */}
+            <div className="w-1/2 flex flex-col justify-center ml-20 px-16 py-12 fixed left-0 top-0 h-screen">
+                <div className="space-y-12">
+                    {/* Title */}
+                    <div>
+                        <h1 className="text-8xl font-tan font-bold text-[#c0211f] mb-4">
+                            RIFT '26
+                        </h1>
+                        <p className="text-gray-400 text-xl">Hackathon Registration</p>
+                    </div>
+
+                    {/* Steps */}
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-4 transition-all duration-300 opacity-50">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
+                                1
+                            </div>
+                            <span className="text-white text-2xl font-medium">Search Team</span>
+                        </div>
+
+                        <div className="flex items-center gap-4 transition-all duration-300 opacity-50">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
+                                2
+                            </div>
+                            <span className="text-white text-2xl font-medium">Verify Details</span>
+                        </div>
+
+                        <div className="flex items-center gap-4 transition-all duration-300 opacity-100 scale-105">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
+                                3
+                            </div>
+                            <span className="text-white text-2xl font-medium">Complete RSVP</span>
                         </div>
                     </div>
-                )}
+                </div>
+            </div>
 
-                {/* Step 2: Edit team members */}
-                {step === 'team_edit' && (
-                    <div className="bg-white rounded-2xl shadow-xl p-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Edit Team Members</h2>
-                        <p className="text-gray-600 mb-6">
-                            Update member details, or add/remove members (2-4 total)
-                        </p>
+            {/* Right Side - RSVP Content */}
+            <div className="w-1/2 ml-auto flex items-center justify-center min-h-screen py-12">
+                <div className="w-full max-w-2xl space-y-6 px-8">
 
-                        <div className="space-y-6 mb-6">
-                            {members.map((member, index) => (
-                                <div key={member.id} className="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-medium text-gray-900">
-                                            Member {index + 1} {index === 0 && '(Leader)'}
-                                        </h3>
-                                        {members.length > 2 && index > 0 && (
-                                            <button
-                                                onClick={() => removeMember(index)}
-                                                className="text-red-600 hover:text-red-700 text-sm font-medium"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm text-gray-700 mb-1">Name</label>
+                    {/* Step 1: Edit Members Question */}
+                    {step === 'edit_question' && (
+                        <>
+                            <div className="text-center space-y-6">
+                                <h2 className="text-white text-3xl font-semibold">
+                                    Do you want to edit team member details?
+                                </h2>
+                                <p className="text-gray-400">
+                                    Current members: {members.length} (You can have 2-4 members)
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4 mt-8">
+                                    <button
+                                        onClick={() => setStep('edit_members')}
+                                        className="py-4 px-6 cursor-pointer bg-[#c0211f] text-white rounded-lg font-semibold text-lg hover:bg-[#a01a17] transition-all"
+                                    >
+                                        Yes, Edit Members
+                                    </button>
+                                    <button
+                                        onClick={() => setStep('city_question')}
+                                        className="py-4 cursor-pointer px-6 bg-white/10 text-gray-300 rounded-lg font-semibold text-lg hover:bg-white/20 transition-all"
+                                    >
+                                        No, Keep Current
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Step 2: Edit Members Form */}
+                    {step === 'edit_members' && (
+                        <>
+                            <button
+                                onClick={() => {
+                                    setError('')
+                                    setStep('edit_question')
+                                }}
+                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
+                            >
+                                ← Back
+                            </button>
+
+                            <h2 className="text-white text-2xl font-semibold">Edit Team Members</h2>
+
+
+                            <div className="space-y-4">
+                                {members.map((member, index) => (
+                                    <div key={member.id} className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-white font-medium">
+                                                {index === 0 ? 'Team Leader' : `Member ${index + 1}`}
+                                            </h3>
+                                            {index > 0 && members.length > 2 && (
+                                                <button
+                                                    onClick={() => removeMember(index)}
+                                                    className="text-red-400 cursor-pointer hover:text-red-300 text-sm"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="input-container">
                                             <input
                                                 type="text"
                                                 value={member.name}
                                                 onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                                required
+                                                placeholder="Full Name"
+                                                disabled={index === 0}
+                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm text-gray-700 mb-1">Email</label>
+
+                                        <div className="input-container">
                                             <input
                                                 type="email"
                                                 value={member.email}
                                                 onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                                required
+                                                placeholder="Email Address"
+                                                disabled={index === 0}
+                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm text-gray-700 mb-1">Phone</label>
+
+                                        <div className="input-container">
                                             <input
                                                 type="tel"
+                                                inputMode="numeric"
                                                 value={member.phone}
-                                                onChange={(e) =>
-                                                    handleMemberChange(index, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))
-                                                }
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                onChange={(e) => handleMemberChange(index, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                                                placeholder="Phone Number (10 digits)"
                                                 maxLength={10}
-                                                required
                                                 disabled={index === 0}
+                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
 
-                        {
-                            members.length < 4 && (
-                                <button
-                                    onClick={addMember}
-                                    className="w-full mb-6 bg-gray-200 text-gray-800 py-3 rounded-lg font-medium hover:bg-gray-300 transition"
-                                >
-                                    + Add Member ({members.length}/4)
-                                </button>
-                            )
-                        }
-
-                        < button
-                            onClick={() => setStep('city_question')}
-                            className="w-full bg-indigo-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition"
-                        >
-                            Continue
-                        </button>
-                    </div>
-                )}
-
-                {/* Step 3: Ask if they want to change city */}
-                {step === 'city_question' && (
-                    <div className="bg-white rounded-2xl shadow-xl p-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                            Do you want to change the city?
-                        </h2>
-                        <p className="text-gray-600 mb-6">
-                            Currently selected: <span className="font-semibold">{CITIES.find(c => c.value === city)?.label}</span>
-                        </p>
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => setStep('city_select')}
-                                className="flex-1 bg-indigo-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition"
-                            >
-                                Yes, Change City
-                            </button>
-                            <button
-                                onClick={() => setStep('review')}
-                                className="flex-1 bg-gray-200 text-gray-800 py-4 rounded-lg font-semibold text-lg hover:bg-gray-300 transition"
-                            >
-                                No, Keep Current
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 4: Select city */}
-                {step === 'city_select' && (
-                    <div className="bg-white rounded-2xl shadow-xl p-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                            In which city do you want to join us for RIFT?
-                        </h2>
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            {CITIES.map((c) => (
-                                <button
-                                    key={c.value}
-                                    type="button"
-                                    onClick={() => setCity(c.value)}
-                                    className={`p-6 border-2 rounded-lg font-medium transition text-lg ${city === c.value
-                                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                                        : 'border-gray-200 hover:border-indigo-300'
-                                        }`}
-                                >
-                                    {c.label}
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            onClick={() => setStep('review')}
-                            className="w-full bg-indigo-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition"
-                        >
-                            Continue to Review
-                        </button>
-                    </div>
-                )}
-
-                {/* Step 5: Review and Submit */}
-                {step === 'review' && (
-                    <div className="bg-white rounded-2xl shadow-xl p-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Review Your RSVP</h2>
-
-                        <div className="space-y-6 mb-6">
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-2">City</h3>
-                                <p className="text-gray-600">{CITIES.find(c => c.value === city)?.label}</p>
-                                <button
-                                    onClick={() => setStep('city_question')}
-                                    className="text-indigo-600 text-sm mt-1 hover:underline"
-                                >
-                                    Change
-                                </button>
+                                {members.length < 4 && (
+                                    <button
+                                        onClick={addMember}
+                                        className="w-full cursor-pointer py-3 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 transition font-medium"
+                                    >
+                                        + Add Member
+                                    </button>
+                                )}
                             </div>
 
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-2">Team Members ({members.length})</h3>
-                                <div className="space-y-3">
-                                    {members.map((member, index) => (
-                                        <div key={member.id} className="p-4 bg-gray-50 rounded-lg">
-                                            <p className="font-medium">
-                                                {member.name} {index === 0 && '(Leader)'}
-                                            </p>
-                                            <p className="text-sm text-gray-600">{member.email} • {member.phone}</p>
-                                        </div>
+                            {error && (
+                                <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                    <p className="text-red-200 text-sm">{error}</p>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setError('')
+                                    // Validate all members have complete information
+                                    for (const member of members) {
+                                        if (!member.name || !member.email || !member.phone) {
+                                            setError('Please fill all member details before proceeding')
+                                            return
+                                        }
+                                        if (member.phone.length !== 10) {
+                                            setError(`Phone number must be exactly 10 digits for ${member.name}`)
+                                            return
+                                        }
+                                        if (!member.email.includes('@')) {
+                                            setError(`Invalid email format for ${member.name}`)
+                                            return
+                                        }
+                                    }
+                                    if (members.length < 2) {
+                                        setError('You must have at least 2 team members')
+                                        return
+                                    }
+                                    setStep('city_question')
+                                }}
+                                className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all"
+                            >
+                                Next
+                            </button>
+                        </>
+                    )}
+
+                    {/* Step 3: City Change Question */}
+                    {step === 'city_question' && (
+                        <>
+                            <button
+                                onClick={() => setStep('edit_question')}
+                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
+                            >
+                                ← Back
+                            </button>
+
+                            <div className="space-y-6">
+                                <h2 className="text-white text-2xl font-semibold text-center">
+                                    Do you want to change the city?
+                                </h2>
+                                <p className="text-gray-400 text-center">
+                                    Currently selected: <span className="font-semibold text-white">{CITIES.find(c => c.value === city)?.label}</span>
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4 mt-8">
+                                    <button
+                                        onClick={() => setStep('city_select')}
+                                        className="py-4 px-6 cursor-pointer bg-[#c0211f] text-white rounded-lg font-semibold text-lg hover:bg-[#a01a17] transition-all"
+                                    >
+                                        Yes, Change City
+                                    </button>
+                                    <button
+                                        onClick={() => setStep('review')}
+                                        className="py-4 cursor-pointer px-6 bg-white/10 text-gray-300 rounded-lg font-semibold text-lg hover:bg-white/20 transition-all"
+                                    >
+                                        No, Keep Current
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Step 4: City Selection */}
+                    {step === 'city_select' && (
+                        <>
+                            <button
+                                onClick={() => setStep('city_question')}
+                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
+                            >
+                                ← Back
+                            </button>
+
+                            <div className="space-y-6">
+                                <h2 className="text-white text-2xl font-semibold text-center">
+                                    Select City Venue
+                                </h2>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    {CITIES.map((c) => (
+                                        <button
+                                            key={c.value}
+                                            type="button"
+                                            onClick={() => setCity(c.value)}
+                                            className={`py-4 px-4 rounded-lg font-semibold text-lg transition cursor-pointer ${city === c.value
+                                                ? 'bg-[#c0211f] text-white'
+                                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                                }`}
+                                        >
+                                            {c.label}
+                                        </button>
                                     ))}
                                 </div>
+
                                 <button
-                                    onClick={() => setStep('team_edit_question')}
-                                    className="text-indigo-600 text-sm mt-2 hover:underline"
+                                    onClick={() => setStep('review')}
+                                    className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all"
                                 >
-                                    Change
+                                    Continue to Review
                                 </button>
                             </div>
-                        </div>
+                        </>
+                    )}
 
-                        {error && (
-                            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                                <p className="text-sm text-red-700">{error}</p>
+                    {/* Step 4: Review */}
+                    {step === 'review' && (
+                        <>
+                            <button
+                                onClick={() => setStep('city_question')}
+                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
+                            >
+                                ← Back
+                            </button>
+
+                            <h2 className="text-white text-2xl font-semibold">Review Your RSVP</h2>
+
+                            {error && (
+                                <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                    <p className="text-red-200 text-sm">{error}</p>
+                                </div>
+                            )}
+
+                            <div className="space-y-6">
+                                {/* City */}
+                                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                                    <h3 className="text-gray-400 text-sm mb-2">City</h3>
+                                    <p className="text-white font-semibold text-lg">{CITIES.find(c => c.value === city)?.label}</p>
+                                </div>
+
+                                {/* Team Members */}
+                                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                                    <h3 className="text-gray-400 text-sm mb-3">Team Members ({members.length})</h3>
+                                    <div className="space-y-3">
+                                        {members.map((member, index) => (
+                                            <div key={member.id} className="p-3 bg-white/5 rounded">
+                                                <p className="text-white font-medium">
+                                                    {member.name} {index === 0 && '(Leader)'}
+                                                </p>
+                                                <p className="text-gray-400 text-sm">{member.email}</p>
+                                                <p className="text-gray-400 text-sm">{member.phone}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                        )}
 
-                        <button
-                            onClick={handleSubmit}
-                            disabled={submitting}
-                            className="w-full bg-indigo-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
-                        >
-                            {submitting ? 'Submitting...' : 'Submit RSVP & Lock'}
-                        </button>
-                    </div>
-                )}
+                            <div className="bg-yellow-500/20 border border-yellow-500/50 p-4 rounded-lg">
+                                <p className="text-yellow-200 text-sm">
+                                    ⚠️ Once submitted, your RSVP will be locked and cannot be changed
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting || members.length < 2}
+                                className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {submitting ? 'Submitting...' : 'Confirm RSVP & Lock'}
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     )

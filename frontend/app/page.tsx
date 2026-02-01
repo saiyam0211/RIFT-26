@@ -130,10 +130,10 @@ export default function Home() {
     const getStepInfo = () => {
         if (step === 'search') {
             return { number: 1, text: 'Search Team' };
-        } else if (step === 'email') {
-            return { number: 2, text: 'Verify Email' };
+        } else if (step === 'email' || step === 'verifying') {
+            return { number: 2, text: 'Verify Details' };
         } else {
-            return { number: 3, text: 'Verify OTP' };
+            return { number: 3, text: 'Complete RSVP' };
         }
     };
 
@@ -266,14 +266,14 @@ export default function Home() {
                                 ← Back
                             </button>
 
-                            <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
+                            {/* <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
                                 <p className="text-blue-200 text-sm">
                                     Team: <strong>{selectedTeam?.team_name}</strong>
                                 </p>
                                 <p className="text-blue-200/80 text-xs mt-1">
                                     Leader Email: {selectedTeam?.masked_email}
                                 </p>
-                            </div>
+                            </div> */}
 
                             {error && (
                                 <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
@@ -290,7 +290,7 @@ export default function Home() {
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="youremail@example.com"
+                                        placeholder={`${selectedTeam?.masked_email}`}
                                         autoComplete="email"
                                         className="text-center"
                                     />
@@ -300,7 +300,7 @@ export default function Home() {
                             <button
                                 onClick={handleSendOTP}
                                 disabled={loading || !email}
-                                className="w-full bg-[#c0211f] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? 'Sending...' : 'Send OTP'}
                             </button>
@@ -330,10 +330,10 @@ export default function Home() {
                             )}
 
                             <div>
-                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                <label className="block text-gray-300 text-sm font-medium mb-2 text-center">
                                     Enter OTP
                                 </label>
-                                <div className="input-container w-full">
+                                <div className="input-container max-w-xs mx-auto">
                                     <input
                                         type="tel"
                                         inputMode="numeric"
@@ -341,8 +341,10 @@ export default function Home() {
                                         maxLength={6}
                                         value={otpCode}
                                         onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="Enter 6-digit OTP"
+                                        placeholder="******"
                                         autoComplete="off"
+                                        className="text-center tracking-widest text-2xl font-mono"
+                                        style={{ letterSpacing: '0.8em', paddingLeft: '0.8em' }}
                                     />
                                 </div>
                             </div>
@@ -350,7 +352,7 @@ export default function Home() {
                             <button
                                 onClick={() => handleVerifyOTP(otpCode)}
                                 disabled={loading || otpCode.length !== 6}
-                                className="w-full bg-[#c0211f] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? 'Verifying...' : 'Verify OTP'}
                             </button>
