@@ -165,3 +165,42 @@ func (s *TeamService) GetDashboard(ctx context.Context, token string) (*models.T
 
 	return team, announcements, qrCodeDataURL, nil
 }
+
+// VerifyAndGetLeaderPhone verifies last 4 digits and returns full leader phone number
+func (s *TeamService) VerifyAndGetLeaderPhone(ctx context.Context, teamID uuid.UUID, last4Digits string) (string, error) {
+	// Get team members
+	members, err := s.teamRepo.GetMembersByTeamID(ctx, teamID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get team members: %w", err)
+	}
+
+	if len(members) == 0 {
+		return "", fmt.Errorf("no members found for this team")
+	}
+
+	// Find team leader
+	var leaderPhone string
+	for _, member := range members {
+		if member.Role == "leader" {
+			leaderPhone = member.Phone
+			break
+		}
+	}
+
+	// If no explicit leader, use first member
+	if leaderPhone == "" {
+		leaderPhone = members[0].Phone
+	}
+
+	// Verify last 4 digits
+	if len(leaderPhone) < 4 {
+		return "", fmt.Errorf("invalid phone number format")
+	}
+
+	actualLast4 := leaderPhone[len(leaderPhone)-4:]
+	if actualLast4 != last4Digits {
+		return "", fmt.Errorf("phone number verification failed")
+	}
+
+	return leaderPhone, nil
+}

@@ -87,6 +87,7 @@ func main() {
 		teams := v1.Group("/teams")
 		{
 			teams.GET("/search", teamHandler.SearchTeams)
+			teams.POST("/verify-phone", teamHandler.VerifyPhone)
 			teams.GET("/:id", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.GetTeam)
 			teams.PUT("/:id/rsvp", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP)
 		}

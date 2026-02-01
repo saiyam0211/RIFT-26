@@ -108,3 +108,34 @@ func (h *TeamHandler) GetDashboard(c *gin.Context) {
 		"qr_code":       qrCode,
 	})
 }
+
+// VerifyPhone verifies last 4 digits of team leader's phone and returns full number
+// POST /api/v1/teams/verify-phone
+func (h *TeamHandler) VerifyPhone(c *gin.Context) {
+	var req struct {
+		TeamID      string `json:"team_id" binding:"required"`
+		Last4Digits string `json:"last_4_digits" binding:"required,len=4"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request. Please provide team_id and last_4_digits"})
+		return
+	}
+
+	teamID, err := uuid.Parse(req.TeamID)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid team ID"})
+		return
+	}
+
+	phoneNumber, err := h.teamService.VerifyAndGetLeaderPhone(c.Request.Context(), teamID, req.Last4Digits)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"phone_number": phoneNumber,
+		"message":      "Phone number verified successfully",
+	})
+}

@@ -1,363 +1,404 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { auth } from '@/lib/firebase'
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
-import axios from 'axios'
-import { useAuthStore } from '@/store/auth-store'
-
-declare global {
-    interface Window {
-        recaptchaVerifier: RecaptchaVerifier
-    }
-}
-
-interface TeamMember {
-    name: string;
-    email: string;
-    phone: string;
-    user_type: string;
-}
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import { auth } from '@/lib/firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { setAuth } from '@/lib/auth';
 
 interface Team {
     id: string;
-    team_id: string;
     team_name: string;
-    city: string;
-    members: TeamMember[];
-    member_count: number;
     masked_phone: string;
-    status?: string;
+    city: string | null;
+    status: string;
+    member_count: number;
+    leader_name?: string;
+    members?: Array<{ user_type: string; name: string }>;
 }
 
-export default function HomePage() {
-    const router = useRouter()
-    const [step, setStep] = useState<'search' | 'otp' | 'verifying'>('search')
-    const [searchQuery, setSearchQuery] = useState('')
-    const [searchResults, setSearchResults] = useState<any[]>([])
-    const [suggestions, setSuggestions] = useState<Team[]>([])
-    const [showSuggestions, setShowSuggestions] = useState(false)
-    const [selectedTeam, setSelectedTeam] = useState<any>(null)
-    const [phoneNumber, setPhoneNumber] = useState('')
-    const [otpCode, setOTPCode] = useState('')
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
-    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
-    const { setAuth } = useAuthStore()
+export default function Home() {
+    const router = useRouter();
+    const [step, setStep] = useState<'search' | 'otp' | 'verifying'>('search');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Team[]>([]);
+    const [suggestions, setSuggestions] = useState<Team[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [otpCode, setOtpCode] = useState('');
+    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    // Fetch suggestions as user types
+    // Debounced autocomplete
     useEffect(() => {
-        const fetchSuggestions = async () => {
-            if (searchQuery.trim().length < 2) {
-                setSuggestions([])
-                setShowSuggestions(false)
-                return
+        const timer = setTimeout(async () => {
+            if (searchQuery.trim().length >= 2) {
+                try {
+                    const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/teams/search`, {
+                        params: { query: searchQuery },
+                    });
+                    setSuggestions(response.data.teams || []);
+                    setShowSuggestions(true);
+                } catch (err) {
+                    console.error('Autocomplete error:', err);
+                    setSuggestions([]);
+                }
+            } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
             }
+        }, 300);
 
-            try {
-                const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/teams/search`, {
-                    params: { query: searchQuery, limit: 5 },
-                })
-                setSuggestions(response.data.teams || [])
-                setShowSuggestions(true)
-            } catch (err) {
-                console.error('Error fetching suggestions:', err)
-                setSuggestions([])
-            }
-        }
-
-        const debounceTimer = setTimeout(fetchSuggestions, 300)
-        return () => clearTimeout(debounceTimer)
-    }, [searchQuery])
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const setupRecaptcha = () => {
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                size: 'invisible',
-            })
+        // Clear any existing verifier
+        if ((window as any).recaptchaVerifier) {
+            try {
+                (window as any).recaptchaVerifier.clear();
+            } catch (e) {
+                console.log('Error clearing recaptcha:', e);
+            }
         }
-    }
+
+        // Create new verifier
+        (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible',
+            callback: () => {
+                console.log('reCAPTCHA solved');
+            },
+            'expired-callback': () => {
+                console.log('reCAPTCHA expired');
+            }
+        });
+    };
 
     const handleSearch = async () => {
-        if (!searchQuery.trim()) return
-        setLoading(true)
-        setError('')
-        setShowSuggestions(false)
+        if (!searchQuery.trim()) return;
+        setLoading(true);
+        setError('');
+        setShowSuggestions(false);
 
         try {
             const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/teams/search`, {
                 params: { query: searchQuery },
-            })
-            setSearchResults(response.data.teams || [])
+            });
+            setSearchResults(response.data.teams || []);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to search teams')
+            setError(err.response?.data?.error || 'Failed to search teams');
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
+    };
 
     const handleTeamSelect = (team: any) => {
-        setSelectedTeam(team)
-        setPhoneNumber('')
-        setSearchQuery(team.team_name)
-        setShowSuggestions(false)
-        setStep('otp')
-    }
+        setSelectedTeam(team);
+        setPhoneNumber('');
+        setSearchQuery(team.team_name);
+        setShowSuggestions(false);
+        setStep('otp');
+    };
 
     const handleSuggestionClick = (team: Team) => {
-        handleTeamSelect(team)
-    }
+        handleTeamSelect(team);
+    };
 
     const handleSendOTP = async () => {
-        if (!phoneNumber || phoneNumber.length !== 10) {
-            setError('Please enter a valid 10-digit phone number')
-            return
+        if (!selectedTeam) return;
+
+        // Verify that 4 digits are entered
+        if (phoneNumber.length !== 4) {
+            setError('Please enter the last 4 digits of the team leader\'s phone number');
+            return;
         }
 
-        setLoading(true)
-        setError('')
+        // Verify last 4 digits match
+        const maskedLast4 = selectedTeam.masked_phone.slice(-4);
+        if (phoneNumber !== maskedLast4) {
+            setError('Last 4 digits do not match. Please check and try again.');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
 
         try {
-            setupRecaptcha()
-            const formattedPhone = `+91${phoneNumber}`
-            const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier)
-            setConfirmationResult(confirmation)
-            setStep('verifying')
+            // Get full phone number from backend after verification
+            const verifyResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/teams/verify-phone`, {
+                team_id: selectedTeam.id,
+                last_4_digits: phoneNumber
+            });
+
+            const fullPhoneNumber = verifyResponse.data.phone_number;
+
+            // Send OTP via Firebase
+            setupRecaptcha();
+            const formattedPhone = `+91${fullPhoneNumber}`;
+            const confirmation = await signInWithPhoneNumber(auth, formattedPhone, (window as any).recaptchaVerifier);
+            setConfirmationResult(confirmation);
+            setStep('verifying');
         } catch (err: any) {
-            setError(err.message || 'Failed to send OTP')
-            console.error('OTP Send Error:', err)
+            setError(err.response?.data?.error || err.message || 'Failed to send OTP');
+            console.error('OTP Send Error:', err);
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
+    };
 
     const handleVerifyOTP = async () => {
         if (!otpCode || otpCode.length !== 6) {
-            setError('Please enter a valid 6-digit OTP')
-            return
+            setError('Please enter a valid 6-digit OTP');
+            return;
         }
 
         if (!confirmationResult) {
-            setError('Please request OTP first')
-            return
+            setError('Please request OTP first');
+            return;
         }
 
-        setLoading(true)
-        setError('')
+        setLoading(true);
+        setError('');
 
         try {
             // Verify OTP with Firebase
-            const result = await confirmationResult.confirm(otpCode)
-            const idToken = await result.user.getIdToken()
+            const result = await confirmationResult.confirm(otpCode);
+            const idToken = await result.user.getIdToken();
 
             // Send to backend for verification and JWT generation
             const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-firebase`, {
                 id_token: idToken,
-                team_id: selectedTeam.id,
-            })
+                team_id: selectedTeam?.id,
+            });
 
             // Save auth data
-            setAuth(response.data.token, response.data.team)
+            setAuth(response.data.token, response.data.team);
 
             // Redirect based on RSVP status
             if (response.data.team.rsvp_locked) {
-                router.push(`/dashboard/${response.data.team.dashboard_token}`)
+                router.push(`/dashboard/${response.data.team.dashboard_token}`);
             } else {
-                router.push(`/rsvp/${response.data.team.id}`)
+                router.push(`/rsvp/${response.data.team.id}`);
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || err.message || 'Failed to verify OTP')
-            console.error('OTP Verification Error:', err)
+            setError(err.response?.data?.error || err.message || 'Failed to verify OTP');
+            console.error('OTP Verification Error:', err);
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
-
-    const getLeader = (team: Team) => {
-        return team.members?.find(m => m.user_type === 'leader') || team.members?.[0]
-    }
+    };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-indigo-600 mb-2">RIFT '26</h1>
-                    <p className="text-gray-600">Hackathon Registration</p>
-                </div>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-md">
+                <div className="bg-white rounded-2xl shadow-xl p-8">
+                    <div className="text-center mb-8">
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                            RIFT '26
+                        </h1>
+                        <p className="text-gray-600 mt-2">Hackathon Registration</p>
+                    </div>
 
-                {step === 'search' && (
-                    <div className="space-y-4">
-                        <div className="relative">
+                    {error && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Search Step */}
+                    {step === 'search' && (
+                        <div className="space-y-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Search Your Team
                             </label>
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                                onFocus={() => searchQuery.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
-                                placeholder="Enter team name..."
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                                autoComplete="off"
-                            />
 
-                            {/* Autocomplete Suggestions Dropdown */}
-                            {showSuggestions && suggestions.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-                                    {suggestions.map((team) => (
-                                        <div
-                                            key={team.id}
-                                            onClick={() => handleSuggestionClick(team)}
-                                            className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="font-semibold text-gray-900">{team.team_name}</div>
-                                                    {team.leader_name && (
-                                                        <div className="text-sm text-gray-600 mt-1">
-                                                            <span className="font-medium">Leader:</span> {team.leader_name}
+                            {/* Search Input with Autocomplete */}
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                    placeholder="Enter team name"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                />
+
+                                {/* Autocomplete Suggestions Dropdown */}
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                                        {suggestions.map((team) => (
+                                            <div
+                                                key={team.id}
+                                                onClick={() => handleSuggestionClick(team)}
+                                                className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="font-semibold text-gray-900">{team.team_name}</div>
+                                                        {team.leader_name && (
+                                                            <div className="text-sm text-gray-600 mt-1">
+                                                                <span className="font-medium">Leader:</span> {team.leader_name}
+                                                            </div>
+                                                        )}
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            {team.city} • {team.member_count} members
                                                         </div>
-                                                    )}
-                                                    <div className="text-xs text-gray-500 mt-0.5">
-                                                        {team.city} • {team.member_count || 0} members
                                                     </div>
-                                                </div>
-                                                {team.status && (
-                                                    <div className="ml-4">
-                                                        <span className={`px-2 py-1 text-xs rounded-full ${team.status === 'confirmed'
+                                                    {team.status && (
+                                                        <div className="ml-4">
+                                                            <span className={`px-2 py-1 text-xs rounded-full ${team.status === 'confirmed'
                                                                 ? 'bg-green-100 text-green-700'
                                                                 : team.status === 'shortlisted'
                                                                     ? 'bg-blue-100 text-blue-700'
                                                                     : 'bg-gray-100 text-gray-700'
-                                                            }`}>
-                                                            {team.status}
-                                                        </span>
-                                                    </div>
-                                                )}
+                                                                }`}>
+                                                                {team.status}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={handleSearch}
+                                disabled={loading || !searchQuery.trim()}
+                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Searching...' : 'Search Team'}
+                            </button>
+
+                            {searchResults.length > 0 && (
+                                <div className="mt-6 space-y-2">
+                                    <p className="text-sm font-medium text-gray-700">Select your team:</p>
+                                    {searchResults.map((team) => (
+                                        <button
+                                            key={team.id}
+                                            onClick={() => handleTeamSelect(team)}
+                                            className="w-full p-4 text-left border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition"
+                                        >
+                                            <p className="font-medium text-gray-900">{team.team_name}</p>
+                                            <p className="text-sm text-gray-600">{team.masked_phone}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {team.city || 'No city selected'} • {team.member_count} members
+                                            </p>
+                                        </button>
                                     ))}
                                 </div>
                             )}
-
-                            {/* No suggestions found */}
-                            {showSuggestions && suggestions.length === 0 && searchQuery.length >= 2 && !loading && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
-                                    No teams found
-                                </div>
-                            )}
                         </div>
+                    )}
 
-                        <button
-                            onClick={handleSearch}
-                            disabled={loading || !searchQuery.trim()}
-                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
-                        >
-                            {loading ? 'Searching...' : 'Search Team'}
-                        </button>
+                    {/* Phone Verification Step */}
+                    {step === 'otp' && selectedTeam && (
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => { setStep('search'); setSelectedTeam(null); setShowSuggestions(false); }}
+                                className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center"
+                            >
+                                ← Back to search
+                            </button>
 
-                        {searchResults.length > 0 && (
-                            <div className="mt-6 space-y-2">
-                                <p className="text-sm font-medium text-gray-700">Select your team:</p>
-                                {searchResults.map((team) => (
-                                    <button
-                                        key={team.id}
-                                        onClick={() => handleTeamSelect(team)}
-                                        className="w-full p-4 text-left border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition"
-                                    >
-                                        <p className="font-medium text-gray-900">{team.team_name}</p>
-                                        <p className="text-sm text-gray-600">{team.masked_phone}</p>
-                                        <p className="text-xs text-gray-500">
-                                            {team.city || 'No city selected'} • {team.member_count} members
-                                        </p>
-                                    </button>
-                                ))}
+                            <div className="bg-indigo-50 p-4 rounded-lg mb-4">
+                                <p className="font-semibold text-gray-900">{selectedTeam.team_name}</p>
+                                {/* <p className="text-sm text-gray-600 mt-1">
+                                    Team Leader's Phone: {selectedTeam.masked_phone}
+                                </p> */}
                             </div>
-                        )}
-                    </div>
-                )}
 
-                {step === 'otp' && selectedTeam && (
-                    <div className="space-y-4">
-                        <button
-                            onClick={() => { setStep('search'); setSelectedTeam(null); setShowSuggestions(false); }}
-                            className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center"
-                        >
-                            ← Back to search
-                        </button>
-                        <div className="bg-indigo-50 p-4 rounded-lg">
-                            <p className="font-medium text-gray-900">{selectedTeam.team_name}</p>
-                            <p className="text-sm text-gray-600">{selectedTeam.masked_phone}</p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Team Leader's Phone Number
-                            </label>
-                            <input
-                                type="tel"
-                                value={phoneNumber}
-                                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                placeholder="10-digit phone number"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                maxLength={10}
-                            />
-                        </div>
-                        <button
-                            onClick={handleSendOTP}
-                            disabled={loading || phoneNumber.length !== 10}
-                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
-                        >
-                            {loading ? 'Sending...' : 'Send OTP'}
-                        </button>
-                    </div>
-                )}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Enter Last 4 Digits to Verify
+                                </label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={phoneNumber}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        if (value.length <= 4) {
+                                            setPhoneNumber(value);
+                                        }
+                                    }}
+                                    placeholder="••••"
+                                    maxLength={4}
+                                    className="w-full px-4 py-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-center text-3xl tracking-widest font-mono font-bold"
+                                />
+                                <p className="text-xs text-gray-500 mt-2 text-center">
+                                    Enter the last 4 digits of the team leader's registered mobile number
+                                </p>
+                            </div>
 
-                {step === 'verifying' && (
-                    <div className="space-y-4">
-                        <button
-                            onClick={() => setStep('otp')}
-                            className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center"
-                        >
-                            ← Back
-                        </button>
-                        <div className="bg-green-50 p-4 rounded-lg text-center">
-                            <p className="text-sm text-green-700">
-                                OTP sent to +91{phoneNumber}
-                            </p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Enter OTP
-                            </label>
-                            <input
-                                type="text"
-                                value={otpCode}
-                                onChange={(e) => setOTPCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                placeholder="6-digit OTP"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-center text-2xl tracking-widest"
-                                maxLength={6}
-                            />
-                        </div>
-                        <button
-                            onClick={handleVerifyOTP}
-                            disabled={loading || otpCode.length !== 6}
-                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
-                        >
-                            {loading ? 'Verifying...' : 'Verify & Continue'}
-                        </button>
-                    </div>
-                )}
+                            <button
+                                onClick={handleSendOTP}
+                                disabled={loading || phoneNumber.length !== 4}
+                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Verifying...' : 'Send OTP'}
+                            </button>
 
-                {error && (
-                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-700">{error}</p>
-                    </div>
-                )}
+                            {/* reCAPTCHA Container - Now visible */}
+                            <div className="mt-4">
+                                <div id="recaptcha-container"></div>
+                            </div>
+                        </div>
+                    )}
 
-                <div id="recaptcha-container"></div>
+                    {/* OTP Verification Step */}
+                    {step === 'verifying' && (
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => setStep('otp')}
+                                className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center"
+                            >
+                                ← Back
+                            </button>
+
+                            <div className="bg-green-50 p-4 rounded-lg">
+                                <p className="text-sm text-green-800">
+                                    ✓ OTP sent to {selectedTeam?.masked_phone}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Enter OTP
+                                </label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={otpCode}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        if (value.length <= 6) {
+                                            setOtpCode(value);
+                                        }
+                                    }}
+                                    placeholder="6-digit OTP"
+                                    maxLength={6}
+                                    className="w-full px-4 py-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-center text-3xl tracking-widest font-mono font-bold"
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleVerifyOTP}
+                                disabled={loading || otpCode.length !== 6}
+                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Verifying...' : 'Verify OTP'}
+                            </button>
+                        </div>
+                    )}
+
+                    <div id="recaptcha-container"></div>
+                </div>
             </div>
         </div>
-    )
+    );
 }

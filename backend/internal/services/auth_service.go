@@ -32,7 +32,7 @@ func NewAuthService(
 // VerifyFirebaseToken verifies Firebase ID token and authenticates team leader
 func (s *AuthService) VerifyFirebaseToken(ctx context.Context, idToken string, teamID uuid.UUID) (*models.FirebaseAuthResponse, error) {
 	// Verify Firebase ID token
-	uid, phoneNumber, err := s.firebaseAuth.VerifyIDToken(ctx, idToken)
+	_, phoneNumber, err := s.firebaseAuth.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		return nil, fmt.Errorf("invalid Firebase token: %w", err)
 	}
@@ -62,9 +62,10 @@ func (s *AuthService) VerifyFirebaseToken(ctx context.Context, idToken string, t
 	}
 
 	// Generate JWT token for the team leader
+	// Firebase UID is not a valid UUID format, so we use the teamID for JWT
 	token, err := utils.GenerateJWT(
-		uuid.MustParse(uid), // Use Firebase UID as user ID
-		"",                  // Email not required for phone auth
+		teamID, // Use team ID as the primary identifier
+		"",     // Email not required for phone auth
 		models.UserRoleParticipant,
 		&teamID,
 		s.jwtSecret,
