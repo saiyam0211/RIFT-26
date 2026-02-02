@@ -82,27 +82,26 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen flex relative overflow-hidden">
+        <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
             <RIFTBackground />
 
             {/* Left Side - Fixed Title, Team Name, and QR Code */}
-            <div className="w-1/3 flex flex-col justify-center ml-20 py-12 fixed left-0 top-0 h-screen">
-                <div className="space-y-12">
+            <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 mt-10 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
+                <div className="space-y-8 lg:space-y-12">
                     {/* RIFT Title */}
-                    <div>
-                        <h1 className="text-8xl font-tan font-bold text-[#c0211f] mb-4">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-4xl sm:text-6xl lg:text-8xl font-tan font-bold text-[#c0211f] mb-2 lg:mb-4">
                             RIFT '26
                         </h1>
-                        <p className="text-gray-400 text-xl">Hackathon Dashboard</p>
                     </div>
 
                     {/* Team Name & Status */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 text-center md:text-left">
                         <div>
                             <p className="text-gray-500 text-sm mb-2">Team Name</p>
-                            <h2 className="text-4xl font-bold text-white">{team.team_name}</h2>
+                            <h2 className="text-3xl lg:text-4xl font-bold text-white">{team.team_name}</h2>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 justify-center md:justify-start">
                             {getStatusBadge()}
                             <span className="text-gray-400">•</span>
                             <span className="text-gray-300">{team.city || 'No City'}</span>
@@ -111,7 +110,7 @@ export default function DashboardPage() {
 
                     {/* QR Code */}
                     {qrCodeData && team.status === 'rsvp_done' && (
-                        <div className="bg-white/5 border border-white/10 p-5 rounded-xl w-56">
+                        <div className="bg-white/5 border border-white/10 p-5 mx-auto rounded-xl w-56 justify-center items-center">
                             <p className="text-gray-400 text-sm mb-3">Event Check-in</p>
                             <div className="bg-white p-3 rounded-lg inline-block">
                                 <QRCode value={qrCodeData} size={160} level="H" />
@@ -135,33 +134,21 @@ export default function DashboardPage() {
                             }
                         }}
                         id="copy-btn"
-                        className="w-auto -mt-8 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white py-3 px-7 rounded-lg transition flex items-center justify-center gap-2 font-medium"
+                        className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 font-medium"
                     >
-                        Copy Dashboard Link
+                        📱 Copy Dashboard Link
                     </button>
                 </div>
             </div>
 
             {/* Right Side - Details */}
-            <div className="w-2/3 ml-auto flex items-start justify-center min-h-screen pt-32">
-                <div className="w-full max-w-5xl space-y-6 px-8">
-
-                    {/* Team Stats */}
-                    {/* <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 border border-white/10 p-4 rounded-lg">
-                            <p className="text-gray-400 text-sm">Members</p>
-                            <p className="text-3xl font-bold text-white">{team.members?.length || 0}</p>
-                        </div>
-                        <div className="bg-white/5 border border-white/10 p-4 rounded-lg">
-                            <p className="text-gray-400 text-sm">City</p>
-                            <p className="text-3xl font-bold text-white">{team.city || '-'}</p>
-                        </div>
-                    </div> */}
+            <div className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center min-h-screen mt-0 md:mt-40 py-8 lg:py-12">
+                <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
 
                     {/* Team Members */}
                     {team.members && team.members.length > 0 && (
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-xl">
-                            <h3 className="text-white text-xl font-semibold mb-4">Team Members</h3>
+                        <div className="bg-white/5 border border-white/10 p-2 rounded-xl">
+                            <h3 className="text-white text-xl font-semibold mb-4 px-4 py-1">Team Members</h3>
                             <div className="space-y-3">
                                 {team.members.map((member) => (
                                     <div key={member.id} className="bg-white/5 p-4 rounded-lg">

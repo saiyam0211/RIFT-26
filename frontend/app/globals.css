@@ -7,7 +7,7 @@
 /* Custom Font - TANBUSTER */
 @font-face {
   font-family: 'TANBUSTER';
-  src: url('/TANBUSTER-Bold.otf') format('opentype');
+  src: url('./fonts/TANBUSTER-Bold.otf') format('opentype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -16,7 +16,7 @@
 /* Tailwind v4 CSS-first configuration */
 @theme {
   --font-family: Inter, system-ui, sans-serif;
-  --font-tan: 'TANBUSTER', Inter, system-ui, sans-serif;
+  --font-tan: 'TANBUSTER';
 
   --color-background: #ffffff;
   --color-foreground: #171717;

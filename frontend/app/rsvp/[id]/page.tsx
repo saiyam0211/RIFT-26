@@ -63,6 +63,11 @@ export default function RSVPPage() {
         setLoading(false)
     }, [teamId, authTeam, isAuthenticated, router])
 
+    const getStepInfo = () => {
+        // All steps in RSVP are on step 3 (Complete RSVP)
+        return { number: 3 }
+    }
+
     const addMember = () => {
         if (members.length >= 4) return
         setMembers([
@@ -153,22 +158,52 @@ export default function RSVPPage() {
     }
 
     return (
-        <div className="min-h-screen flex relative overflow-hidden">
+        <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
             <RIFTBackground />
 
             {/* Left Side - Fixed Title and Steps */}
-            <div className="w-1/2 flex flex-col justify-center ml-20 px-16 py-12 fixed left-0 top-0 h-screen">
-                <div className="space-y-12">
+            <div className="w-full lg:w-1/2 flex flex-col justify-center  mt-20 px-28 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
+                <div className="space-y-8 lg:space-y-12">
                     {/* Title */}
-                    <div>
-                        <h1 className="text-8xl font-tan font-bold text-[#c0211f] mb-4">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-4xl sm:text-6xl lg:text-8xl font-tan font-bold text-[#c0211f] mb-2 lg:mb-4">
                             RIFT '26
                         </h1>
-                        <p className="text-gray-400 text-xl">Hackathon Registration</p>
                     </div>
 
-                    {/* Steps */}
-                    <div className="space-y-6">
+                    {/* Steps - Horizontal on Mobile, Vertical on Desktop */}
+                    {/* Mobile: Horizontal Stepper */}
+                    <div className="lg:hidden flex justify-center">
+                        <div className="flex items-center justify-center gap-12 relative w-full">
+                            {/* Step 1 */}
+                            <div className="flex flex-col items-center z-10">
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg bg-[#c0211f] text-white">
+                                    1
+                                </div>
+                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Search Team</span>
+                            </div>
+
+
+                            {/* Step 2 */}
+                            <div className="flex flex-col items-center z-10">
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg bg-[#c0211f] text-white">
+                                    2
+                                </div>
+                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Verify Details</span>
+                            </div>
+
+                            {/* Step 3 */}
+                            <div className="flex flex-col items-center z-10">
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg bg-[#c0211f] text-white scale-110">
+                                    3
+                                </div>
+                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap font-semibold">Complete RSVP</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Desktop: Vertical Steps */}
+                    <div className="hidden lg:block space-y-6">
                         <div className="flex items-center gap-4 transition-all duration-300 opacity-50">
                             <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
                                 1
@@ -187,15 +222,15 @@ export default function RSVPPage() {
                             <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
                                 3
                             </div>
-                            <span className="text-white text-2xl font-medium">Complete RSVP</span>
+                            <span className="text-white text-2xl font-medium">Complete RSVP/ <br />Open Dashboard</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Right Side - RSVP Content */}
-            <div className="w-1/2 ml-auto flex items-center justify-center min-h-screen py-12">
-                <div className="w-full max-w-2xl space-y-6 px-8">
+            <div className="w-full lg:w-1/2 lg:ml-auto flex items-center justify-center min-h-screen py-8 -mt-80 lg:py-12">
+                <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
 
                     {/* Step 1: Edit Members Question */}
                     {step === 'edit_question' && (
@@ -228,7 +263,7 @@ export default function RSVPPage() {
 
                     {/* Step 2: Edit Members Form */}
                     {step === 'edit_members' && (
-                        <>
+                        <div className="mt-72 space-y-6">
                             <button
                                 onClick={() => {
                                     setError('')
@@ -340,7 +375,7 @@ export default function RSVPPage() {
                             >
                                 Next
                             </button>
-                        </>
+                        </div>
                     )}
 
                     {/* Step 3: City Change Question */}
@@ -422,7 +457,7 @@ export default function RSVPPage() {
 
                     {/* Step 4: Review */}
                     {step === 'review' && (
-                        <>
+                        <div className='mt-72 space-y-6'>
                             <button
                                 onClick={() => setStep('city_question')}
                                 className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
@@ -475,7 +510,7 @@ export default function RSVPPage() {
                             >
                                 {submitting ? 'Submitting...' : 'Confirm RSVP & Lock'}
                             </button>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>

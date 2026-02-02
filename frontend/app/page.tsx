@@ -141,23 +141,52 @@ export default function Home() {
     const currentStepInfo = getStepInfo();
 
     return (
-        <div className="min-h-screen flex relative overflow-hidden">
+        <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
             {/* LightRays Background */}
             <RIFTBackground />
 
             {/* Left Side - Fixed Title and Steps */}
-            <div className="w-1/2 flex flex-col justify-center ml-20 px-16 py-12 fixed left-0 top-0 h-screen">
-                <div className="space-y-12">
+            <div className="w-full lg:w-1/2 flex flex-col justify-center mt-20 md:mt-0 px-28 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
+                <div className="space-y-8 lg:space-y-12">
                     {/* Title */}
-                    <div>
-                        <h1 className="text-8xl font-tan font-bold text-[#c0211f] mb-4">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-4xl sm:text-6xl lg:text-8xl font-tan font-bold text-[#c0211f] mb-2 lg:mb-4">
                             RIFT '26
                         </h1>
-                        <p className="text-gray-400 text-xl">Hackathon Registration</p>
                     </div>
 
-                    {/* Steps */}
-                    <div className="space-y-6">
+                    {/* Steps - Horizontal on Mobile, Vertical on Desktop */}
+                    {/* Mobile: Horizontal Stepper */}
+                    <div className="lg:hidden flex justify-center">
+                        <div className="flex items-center justify-center gap-12 relative w-full">
+                            {/* Step 1 */}
+                            <div className="flex flex-col items-center z-10">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${currentStepInfo.number >= 1 ? 'bg-[#c0211f] text-white' : 'bg-gray-700 text-gray-400'}`}>
+                                    1
+                                </div>
+                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Search Team</span>
+                            </div>
+
+                            {/* Step 2 */}
+                            <div className="flex flex-col items-center z-10">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${currentStepInfo.number >= 2 ? 'bg-[#c0211f] text-white' : 'bg-gray-700 text-gray-400'}`}>
+                                    2
+                                </div>
+                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Verify Details</span>
+                            </div>
+
+                            {/* Step 3 */}
+                            <div className="flex flex-col items-center z-10">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all ${currentStepInfo.number >= 3 ? 'bg-[#c0211f] text-white' : 'bg-gray-700 text-gray-400'}`}>
+                                    3
+                                </div>
+                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Complete RSVP</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Desktop: Vertical Steps */}
+                    <div className="hidden lg:block space-y-6">
                         <div className={`flex items-center gap-4 transition-all duration-300 ${currentStepInfo.number === 1 ? 'opacity-100 scale-105' : 'opacity-50'}`}>
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${currentStepInfo.number >= 1 ? 'bg-[#c0211f] text-white' : 'bg-gray-700 text-gray-400'}`}>
                                 1
@@ -182,9 +211,9 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* Right Side - Dynamic Content */}
-            <div className="w-1/2 ml-auto flex items-center justify-center min-h-screen">
-                <div className="w-full max-w-md">
+            {/* Right Side - Content */}
+            <div className="w-full lg:w-1/2 lg:ml-auto flex items-center justify-center min-h-screen py-8 md:mt-0 -mt-96 lg:py-12">
+                <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
                     {/* Search Step */}
                     {step === 'search' && (
                         <div>
@@ -206,7 +235,123 @@ export default function Home() {
                                 {/* Loading Animation - Positioned Absolutely Above */}
                                 {searchingTeams && searchQuery.trim().length >= 2 && (
                                     <div className="relative top-12 left-1/2 transform -translate-x-1/2 z-20">
-                                        <CustomLoader />
+                                        <div className="loader-wrapper">
+                                            <div className="loader"></div>
+                                            <div className="letter-wrapper">
+                                                <span className="loader-letter">S</span>
+                                                <span className="loader-letter">e</span>
+                                                <span className="loader-letter">a</span>
+                                                <span className="loader-letter">r</span>
+                                                <span className="loader-letter">c</span>
+                                                <span className="loader-letter">h</span>
+                                                <span className="loader-letter">i</span>
+                                                <span className="loader-letter">n</span>
+                                                <span className="loader-letter">g</span>
+                                            </div>
+                                        </div>
+                                        <style jsx>{`
+                                            .loader-wrapper {
+                                                position: relative;
+                                                display: flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                color: white;
+                                                user-select: none;
+                                                gap: 10px;
+                                            }
+
+                                            .loader {
+                                                width: 20px;
+                                                height: 20px;
+                                                aspect-ratio: 1 / 1;
+                                                border-radius: 50%;
+                                                background-color: transparent;
+                                                animation: loader-rotate 1.5s linear infinite;
+                                                z-index: 0;
+                                            }
+
+                                            @keyframes loader-rotate {
+                                                0% {
+                                                    transform: rotate(90deg);
+                                                    box-shadow:
+                                                        0 1px 1px 0 #fff inset,
+                                                        0 3px 5px 0 #ff5f9f inset,
+                                                        0 4px 4px 0 #0693ff inset;
+                                                }
+                                                50% {
+                                                    transform: rotate(270deg);
+                                                    background: #7c0911;
+                                                    box-shadow:
+                                                        0 1px 1px 0 #fff inset,
+                                                        0 3px 5px 0 #d60a47 inset,
+                                                        0 4px 4px 0 #fbef19 inset;
+                                                }
+                                                100% {
+                                                    transform: rotate(450deg);
+                                                    box-shadow:
+                                                        0 1px 1px 0 #fff inset,
+                                                        0 3px 5px 0 #ff5f9f inset,
+                                                        0 4px 4px 0 #28a9ff inset;
+                                                }
+                                            }
+                                            .letter-wrapper {
+                                                display: flex;
+                                                gap: 1px;
+                                            }
+                                            .loader-letter {
+                                                display: inline-block;
+                                                opacity: 0.4;
+                                                transform: translateY(0);
+                                                animation: loader-letter-anim 2s infinite;
+                                                z-index: 1;
+                                                border-radius: 50ch;
+                                                border: none;
+                                            }
+
+                                            .loader-letter:nth-child(1) {
+                                                animation-delay: 0s;
+                                            }
+                                            .loader-letter:nth-child(2) {
+                                                animation-delay: 0.1s;
+                                            }
+                                            .loader-letter:nth-child(3) {
+                                                animation-delay: 0.2s;
+                                            }
+                                            .loader-letter:nth-child(4) {
+                                                animation-delay: 0.3s;
+                                            }
+                                            .loader-letter:nth-child(5) {
+                                                animation-delay: 0.4s;
+                                            }
+                                            .loader-letter:nth-child(6) {
+                                                animation-delay: 0.5s;
+                                            }
+                                            .loader-letter:nth-child(7) {
+                                                animation-delay: 0.6s;
+                                            }
+                                            .loader-letter:nth-child(8) {
+                                                animation-delay: 0.7s;
+                                            }
+                                            .loader-letter:nth-child(9) {
+                                                animation-delay: 0.8s;
+                                            }
+
+                                            @keyframes loader-letter-anim {
+                                                0%,
+                                                100% {
+                                                    opacity: 0.4;
+                                                    transform: translateY(0);
+                                                }
+                                                20% {
+                                                    opacity: 1;
+                                                    transform: scale(1.15);
+                                                }
+                                                40% {
+                                                    opacity: 0.7;
+                                                    transform: translateY(0);
+                                                }
+                                            }
+                                        `}</style>
                                     </div>
                                 )}
 

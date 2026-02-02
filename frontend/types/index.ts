@@ -58,6 +58,6 @@ export interface RSVPSubmission {
     name: string
     email: string
     phone: string
-    tshirt_size: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL'
+    tshirt_size?: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL'
   }[]
 }
