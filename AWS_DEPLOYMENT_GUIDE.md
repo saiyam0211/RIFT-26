@@ -284,7 +284,7 @@ aws cloudfront create-invalidation --distribution-id <ID> --paths "/*"
 ### To Update Frontend App:
 ```bash
 # Local
-pnpm build
+pnpm bui
 scp -r .next/standalone ... ubuntu@<IP>:~/app
 
 # Remote
