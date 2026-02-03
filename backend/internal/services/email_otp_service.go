@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/models"
@@ -88,10 +89,13 @@ func (s *EmailOTPService) SendOTP(ctx context.Context, teamID uuid.UUID, email s
 
 	// Send email asynchronously (don't block the response)
 	go func() {
+		log.Printf("[EMAIL] Attempting to send OTP to %s (Team: %s)", email, team.TeamName)
 		err := s.emailService.SendOTP(email, otp.OTPCode, team.TeamName)
 		if err != nil {
 			// Log the error but don't fail the request
-			fmt.Printf("Failed to send OTP email to %s: %v\n", email, err)
+			log.Printf("[EMAIL ERROR] Failed to send OTP email to %s: %v", email, err)
+		} else {
+			log.Printf("[EMAIL SUCCESS] OTP sent successfully to %s", email)
 		}
 	}()
 
