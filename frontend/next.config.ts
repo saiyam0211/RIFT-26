@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: '/hackathon',
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
