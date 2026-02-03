@@ -113,6 +113,9 @@ export default function Home() {
 
             setAuth(response.data.token, response.data.team);
 
+            // Store user email for leader identification
+            localStorage.setItem('user_email', email);
+
             const team = response.data.team;
             if (team.rsvp_locked && team.dashboard_token) {
                 router.push(`/dashboard/${team.dashboard_token}`);

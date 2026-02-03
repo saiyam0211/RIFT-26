@@ -190,3 +190,150 @@ func MaskEmail(email string) string {
 	maskedLocal := localPart[:visibleChars] + "***"
 	return maskedLocal + "@" + domain
 }
+
+// SendTicketCreatedEmail sends notification when a ticket is created
+func (s *EmailService) SendTicketCreatedEmail(to, teamName, subject, ticketID string) error {
+	emailSubject := "Ticket Submitted - RIFT '26"
+	body := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<style>
+		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #060010; color: #fff; padding: 0; margin: 0; }
+		.container { max-width: 600px; margin: 40px auto; background: linear-gradient(135deg, #1a0420 0%%, #060010 100%%); border: 1px solid #c0211f30; border-radius: 12px; overflow: hidden; }
+		.header { background: linear-gradient(90deg, #c0211f 0%%, #8a1816 100%%); padding: 30px; text-align: center; }
+		.header h1 { margin: 0; font-size: 28px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+		.content { padding: 30px; }
+		.ticket-box { background: rgba(192, 33, 31, 0.1); border-left: 4px solid #c0211f; padding: 20px; margin: 20px 0; border-radius: 8px; }
+		.ticket-box strong { color: #c0211f; }
+		.footer { padding: 20px 30px; background: rgba(255,255,255,0.03); border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #888; text-align: center; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<h1>🎫 RIFT '26 Support Ticket</h1>
+		</div>
+		<div class="content">
+			<p>Hi <strong>%s</strong>,</p>
+			<p>Your support ticket has been successfully submitted to the RIFT '26 team.</p>
+			
+			<div class="ticket-box">
+				<strong>Ticket ID:</strong> %s<br>
+				<strong>Subject:</strong> %s
+			</div>
+			
+			<p>Our team will review your request and respond as soon as possible. You'll receive an email notification when there's an update.</p>
+			
+			<p style="margin-top: 30px; color: #aaa; font-size: 14px;">Thank you for your patience!</p>
+		</div>
+		<div class="footer">
+			<strong>RIFT '26 Hackathon Team</strong><br>
+			This is an automated email. Please monitor your inbox for updates.
+		</div>
+	</div>
+</body>
+</html>
+	`, teamName, ticketID, subject)
+
+	return s.sendEmail(to, emailSubject, body)
+}
+
+// SendTicketResolvedEmail sends notification when a ticket is resolved
+func (s *EmailService) SendTicketResolvedEmail(to, teamName, subject, resolution string, editAllowed bool, editMinutes int) error {
+	emailSubject := "Ticket Resolved - RIFT '26"
+
+	editInfo := ""
+	if editAllowed {
+		editInfo = fmt.Sprintf(`
+			<div style="background: rgba(192, 33, 31, 0.15); border-left: 4px solid #c0211f; padding: 20px; margin: 20px 0; border-radius: 8px;">
+				<h3 style="margin-top: 0; color: #c0211f;">⚠️ Team Editing Enabled</h3>
+				<p>You can now edit your team details for the next <strong>%d minutes</strong>.</p>
+				<p style="font-size: 14px; color: #aaa;">Visit your dashboard to make changes before the time expires.</p>
+			</div>
+		`, editMinutes)
+	}
+
+	body := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<style>
+		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #060010; color: #fff; padding: 0; margin: 0; }
+		.container { max-width: 600px; margin: 40px auto; background: linear-gradient(135deg, #1a0420 0%%, #060010 100%%); border: 1px solid #20c02030; border-radius: 12px; overflow: hidden; }
+		.header { background: linear-gradient(90deg, #20c020 0%%, #168a16 100%%); padding: 30px; text-align: center; }
+		.header h1 { margin: 0; font-size: 28px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+		.content { padding: 30px; }
+		.resolution-box { background: rgba(255,255,255,0.05); padding: 20px; margin: 20px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+		.footer { padding: 20px 30px; background: rgba(255,255,255,0.03); border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #888; text-align: center; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<h1>✅ Ticket Resolved</h1>
+		</div>
+		<div class="content">
+			<p>Hi <strong>%s</strong>,</p>
+			<p>Great news! Your support ticket has been resolved by our team.</p>
+			
+			<p><strong>Subject:</strong> %s</p>
+			
+			<div class="resolution-box">
+				<strong style="color: #20c020;">Resolution:</strong><br>
+				<p style="margin: 10px 0; line-height: 1.6;">%s</p>
+			</div>
+			
+			%s
+			
+			<p style="margin-top: 30px; color: #aaa; font-size: 14px;">
+				If you have any further questions, please feel free to raise a new ticket from your dashboard.
+			</p>
+		</div>
+		<div class="footer">
+			<strong>RIFT '26 Hackathon Team</strong>
+		</div>
+	</div>
+</body>
+</html>
+	`, teamName, subject, resolution, editInfo)
+
+	return s.sendEmail(to, emailSubject, body)
+}
+
+// SendBulkCustomEmail sends custom HTML email to multiple recipients
+func (s *EmailService) SendBulkCustomEmail(recipients []string, subject, htmlContent string) error {
+	// Send emails in batches to avoid SMTP rate limits
+	batchSize := 50
+
+	for i := 0; i < len(recipients); i += batchSize {
+		end := i + batchSize
+		if end > len(recipients) {
+			end = len(recipients)
+		}
+
+		batch := recipients[i:end]
+		for _, recipient := range batch {
+			if err := s.sendEmail(recipient, subject, htmlContent); err != nil {
+				return fmt.Errorf("failed to send to %s: %w", recipient, err)
+			}
+		}
+
+		// Small delay between batches to avoid rate limiting
+		//time.Sleep(100 * time.Millisecond)
+	}
+
+	return nil
+}
+
+// SendMail is a public wrapper for sending emails (for compatibility)
+func (s *EmailService) SendMail(recipients []string, subject, htmlBody string) error {
+	for _, recipient := range recipients {
+		if err := s.sendEmail(recipient, subject, htmlBody); err != nil {
+			return err
+		}
+	}
+	return nil
+}

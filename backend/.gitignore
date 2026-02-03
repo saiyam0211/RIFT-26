@@ -1,0 +1,33 @@
+# Binaries
+bin/
+server
+*.exe
+*.out
+
+# Dependency directory
+vendor/
+
+# Go workspace
+go.work
+
+# Test coverage
+coverage/
+*.cover
+*.out
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Private Configuration / Credentials
+credentials/
+*-credentials.json
+*-key.json
+
+# IDEs
+.idea/
+.vscode/
+
+# System
+.DS_Store

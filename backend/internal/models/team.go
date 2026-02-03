@@ -43,6 +43,7 @@ type Team struct {
 	CheckedInBy      *uuid.UUID   `json:"checked_in_by" db:"checked_in_by"`
 	DashboardToken   *string      `json:"dashboard_token" db:"dashboard_token"`
 	MemberCount      int          `json:"member_count" db:"member_count"`
+	EditAllowedUntil *time.Time   `json:"edit_allowed_until,omitempty" db:"edit_allowed_until"`
 	CreatedAt        time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time    `json:"updated_at" db:"updated_at"`
 	Members          []TeamMember `json:"members,omitempty"`

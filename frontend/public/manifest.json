@@ -1,0 +1,32 @@
+{
+  "name": "RIFT '26 - Team Dashboard",
+  "short_name": "RIFT '26",
+  "description": "RIFT '26 Hackathon Team Dashboard",
+  "start_url": "/hackathon/dashboard",
+  "display": "standalone",
+  "background_color": "#060010",
+  "theme_color": "#c0211f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/hackathon/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/hackathon/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": [
+    {
+      "src": "/hackathon/screenshot.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ]
+}

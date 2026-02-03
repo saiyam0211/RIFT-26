@@ -32,7 +32,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Dashboard', path: '/admin/dashboard', icon: '📊' },
         { name: 'Bulk Upload', path: '/admin/bulk-upload', icon: '📤' },
         { name: 'Teams', path: '/admin/teams', icon: '👥' },
+        { name: 'Tickets', path: '/admin/tickets', icon: '🎫' },
         { name: 'Announcements', path: '/admin/announcements', icon: '📢' },
+        { name: 'Emails', path: '/admin/emails', icon: '📧' },
     ];
 
     return (
