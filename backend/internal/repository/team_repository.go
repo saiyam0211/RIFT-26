@@ -470,6 +470,12 @@ func (r *TeamRepository) ClearAllData(ctx context.Context) error {
 		return fmt.Errorf("failed to delete team members: %w", err)
 	}
 
+	// Delete all support tickets (foreign key constraint)
+	_, err = tx.ExecContext(ctx, "DELETE FROM support_tickets")
+	if err != nil {
+		return fmt.Errorf("failed to delete support tickets: %w", err)
+	}
+
 	// Delete all teams
 	_, err = tx.ExecContext(ctx, "DELETE FROM teams")
 	if err != nil {
