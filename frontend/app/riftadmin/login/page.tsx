@@ -34,7 +34,7 @@ export default function AdminLogin() {
             setAdminUser(data.user);
 
             // Redirect to dashboard
-            router.push('/admin/dashboard');
+            router.push('/riftadmin/dashboard');
         } catch (err: any) {
             setError(err.message || 'Login failed');
         } finally {

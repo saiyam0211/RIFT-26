@@ -12,10 +12,10 @@ export default function AdminPage() {
 
         if (token) {
             // Redirect to admin dashboard
-            router.push('/admin/dashboard');
+            router.push('/riftadmin/dashboard');
         } else {
             // Redirect to login
-            router.push('/admin/login');
+            router.push('/riftadmin/login');
         }
     }, [router]);
 
