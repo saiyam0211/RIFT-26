@@ -86,11 +86,14 @@ func (s *EmailOTPService) SendOTP(ctx context.Context, teamID uuid.UUID, email s
 		return fmt.Errorf("failed to create OTP: %w", err)
 	}
 
-	// Send email
-	err = s.emailService.SendOTP(email, otp.OTPCode, team.TeamName)
-	if err != nil {
-		return fmt.Errorf("failed to send OTP email: %w", err)
-	}
+	// Send email asynchronously (don't block the response)
+	go func() {
+		err := s.emailService.SendOTP(email, otp.OTPCode, team.TeamName)
+		if err != nil {
+			// Log the error but don't fail the request
+			fmt.Printf("Failed to send OTP email to %s: %v\n", email, err)
+		}
+	}()
 
 	return nil
 }
