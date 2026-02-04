@@ -166,8 +166,8 @@ export default function EmailsPage() {
                                                 )
                                             }
                                             className={`px-3 py-1 rounded-lg text-sm transition-colors ${teamSizes.includes(size)
-                                                    ? 'bg-purple-600 text-white'
-                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                                 }`}
                                         >
                                             {size} {size === 1 ? 'member' : 'members'}
@@ -192,8 +192,8 @@ export default function EmailsPage() {
                                                 )
                                             }
                                             className={`px-3 py-1 rounded-lg text-sm transition-colors ${cities.includes(city)
-                                                    ? 'bg-purple-600 text-white'
-                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                                 }`}
                                         >
                                             {city}
