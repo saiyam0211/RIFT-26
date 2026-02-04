@@ -89,12 +89,25 @@ export default function Home() {
             });
 
             console.log('OTP sent successfully:', response.data.message);
-            setStep('verifying');
+
+            // Check if OTP is required (feature flag from backend)
+            const otpRequired = response.data.otp_required;
+
+            if (otpRequired === false) {
+                // If OTP is disabled, auto-login immediately
+                // We pass "000000" as a dummy code since the backend won't check it
+                await handleVerifyOTP("000000");
+            } else {
+                // Normal flow: Ask user for OTP
+                setStep('verifying');
+            }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to send OTP');
             console.error('OTP Send Error:', err);
         } finally {
-            setLoading(false);
+            // Note: We don't set loading to false here if we are auto-verifying
+            // because handleVerifyOTP will take over the loading state
+            if (loading) setLoading(false);
         }
     };
 
