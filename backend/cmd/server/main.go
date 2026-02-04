@@ -50,7 +50,7 @@ func main() {
 	// Initialize services
 	teamService := services.NewTeamService(teamRepo, announcementRepo)
 	checkinService := services.NewCheckinService(teamRepo)
-	emailOTPService := services.NewEmailOTPService(otpRepo, teamRepo, emailService, cfg.JWTSecret)
+	emailOTPService := services.NewEmailOTPService(otpRepo, teamRepo, emailService, cfg.JWTSecret, cfg.EnableEmailOTP)
 	ticketService := services.NewTicketService(db.DB, emailService)
 	announcementService := services.NewAnnouncementService(db.DB)
 

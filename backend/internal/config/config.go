@@ -12,6 +12,8 @@ type Config struct {
 	Port           string
 	Environment    string
 	AllowedOrigins string
+	// Feature Flags
+	EnableEmailOTP bool // Set to false to skip OTP and use email-only auth
 	// SMTP Email Configuration
 	SMTPHost      string
 	SMTPPort      string
@@ -31,6 +33,8 @@ func Load() (*Config, error) {
 		Port:           getEnv("PORT", "8080"),
 		Environment:    getEnv("ENVIRONMENT", "development"),
 		AllowedOrigins: getEnv("ALLOWED_ORIGINS", "http://localhost:3000"),
+		// Feature Flags
+		EnableEmailOTP: getEnv("ENABLE_EMAIL_OTP", "false") == "true",
 		// SMTP Configuration
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),
