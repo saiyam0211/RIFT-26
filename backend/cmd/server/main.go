@@ -56,7 +56,7 @@ func main() {
 
 	// Initialize handlers
 	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret)
-	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService)
+	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
 	volunteerHandler := handlers.NewVolunteerHandler(checkinService)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 	ticketHandler := handlers.NewTicketHandler(ticketService)

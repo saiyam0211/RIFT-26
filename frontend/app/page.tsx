@@ -32,6 +32,7 @@ export default function Home() {
     const [searchingTeams, setSearchingTeams] = useState(false);
     const [error, setError] = useState('');
     const [isRSVPLocked, setIsRSVPLocked] = useState(false);
+    const [otpEnabled, setOtpEnabled] = useState(true); // Track if OTP is enabled on backend
 
     // Debounced autocomplete with loading state
     useEffect(() => {
@@ -88,26 +89,59 @@ export default function Home() {
                 email: email
             });
 
-            console.log('OTP sent successfully:', response.data.message);
+            console.log('Response:', response.data);
+            
+            // Check if OTP is enabled on backend
+            const requiresOtp = response.data.otp_enabled !== false && response.data.requires_otp !== false;
+            setOtpEnabled(requiresOtp);
 
-            // Check if OTP is required (feature flag from backend)
-            const otpRequired = response.data.otp_required;
-
-            if (otpRequired === false) {
-                // If OTP is disabled, auto-login immediately
-                // We pass "000000" as a dummy code since the backend won't check it
-                await handleVerifyOTP("000000");
+            if (!requiresOtp) {
+                // OTP is disabled - directly authenticate and redirect
+                console.log('OTP disabled - authenticating directly');
+                await handleDirectAuth();
             } else {
-                // Normal flow: Ask user for OTP
+                // OTP is enabled - proceed to verification step
+                console.log('OTP sent successfully:', response.data.message);
                 setStep('verifying');
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || err.message || 'Failed to send OTP');
-            console.error('OTP Send Error:', err);
+            setError(err.response?.data?.error || err.message || 'Failed to authenticate');
+            console.error('Auth Error:', err);
         } finally {
-            // Note: We don't set loading to false here if we are auto-verifying
-            // because handleVerifyOTP will take over the loading state
-            if (loading) setLoading(false);
+            setLoading(false);
+        }
+    };
+
+    const handleDirectAuth = async () => {
+        if (!selectedTeam) return;
+
+        setLoading(true);
+        setError('');
+
+        try {
+            // Call verify endpoint without OTP code when OTP is disabled
+            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-email-otp`, {
+                team_id: selectedTeam.id,
+                email: email,
+                otp_code: '', // Empty OTP code when disabled
+            });
+
+            setAuth(response.data.token, response.data.team);
+
+            // Store user email for leader identification
+            localStorage.setItem('user_email', email);
+
+            const team = response.data.team;
+            if (team.rsvp_locked && team.dashboard_token) {
+                router.push(`/dashboard/${team.dashboard_token}`);
+            } else {
+                router.push(`/rsvp/${team.id}`);
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.error || err.message || 'Failed to authenticate');
+            console.error('Authentication Error:', err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -454,7 +488,7 @@ export default function Home() {
                                 disabled={loading || !email}
                                 className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {loading ? 'Sending...' : 'Send OTP'}
+                                {loading ? 'Processing...' : 'Continue'}
                             </button>
                         </div>
                     )}

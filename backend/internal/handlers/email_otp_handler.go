@@ -8,10 +8,14 @@ import (
 
 type EmailOTPHandler struct {
 	emailOTPService *services.EmailOTPService
+	enableOTP       bool
 }
 
-func NewEmailOTPHandler(emailOTPService *services.EmailOTPService) *EmailOTPHandler {
-	return &EmailOTPHandler{emailOTPService: emailOTPService}
+func NewEmailOTPHandler(emailOTPService *services.EmailOTPService, enableOTP bool) *EmailOTPHandler {
+	return &EmailOTPHandler{
+		emailOTPService: emailOTPService,
+		enableOTP:       enableOTP,
+	}
 }
 
 // SendEmailOTP sends an OTP to the team leader's email
@@ -41,8 +45,10 @@ func (h *EmailOTPHandler) SendEmailOTP(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{
-		"message": "OTP sent successfully to your email",
-		"email":   req.Email,
+		"message":      "OTP sent successfully to your email",
+		"email":        req.Email,
+		"otp_enabled":  h.enableOTP,
+		"requires_otp": h.enableOTP,
 	})
 }
 
@@ -52,11 +58,22 @@ func (h *EmailOTPHandler) VerifyEmailOTP(c *gin.Context) {
 	var req struct {
 		TeamID  string `json:"team_id" binding:"required"`
 		Email   string `json:"email" binding:"required,email"`
-		OTPCode string `json:"otp_code" binding:"required,len=6"`
+		OTPCode string `json:"otp_code"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request. Please provide team_id, email, and otp_code"})
+		c.JSON(400, gin.H{"error": "Invalid request. Please provide team_id and email"})
+		return
+	}
+
+	// Only require OTP code when OTP is enabled
+	if h.enableOTP && req.OTPCode == "" {
+		c.JSON(400, gin.H{"error": "OTP code is required"})
+		return
+	}
+
+	if h.enableOTP && len(req.OTPCode) != 6 {
+		c.JSON(400, gin.H{"error": "OTP code must be 6 digits"})
 		return
 	}
 
