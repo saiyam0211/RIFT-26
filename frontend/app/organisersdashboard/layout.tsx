@@ -12,8 +12,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     useEffect(() => {
         const token = getAdminToken();
-        if (!token && pathname !== '/admin/login') {
-            router.push('/admin/login');
+        if (!token && pathname !== '/organisersdashboard/login') {
+            router.push('/organisersdashboard/login');
         } else {
             setUser(getAdminUser());
         }
@@ -21,20 +21,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const handleLogout = () => {
         removeAdminToken();
-        router.push('/admin/login');
+        router.push('/organisersdashboard/login');
     };
 
-    if (pathname === '/admin/login') {
+    if (pathname === '/organisersdashboard/login') {
         return children;
     }
 
     const navItems = [
-        { name: 'Dashboard', path: '/admin/dashboard', icon: '📊' },
-        { name: 'Bulk Upload', path: '/admin/bulk-upload', icon: '📤' },
-        { name: 'Teams', path: '/admin/teams', icon: '👥' },
-        { name: 'Tickets', path: '/admin/tickets', icon: '🎫' },
-        { name: 'Announcements', path: '/admin/announcements', icon: '📢' },
-        { name: 'Emails', path: '/admin/emails', icon: '📧' },
+        { name: 'Dashboard', path: '/organisersdashboard/dashboard', icon: '📊' },
+        { name: 'Bulk Upload', path: '/organisersdashboard/bulk-upload', icon: '📤' },
+        { name: 'Teams', path: '/organisersdashboard/teams', icon: '👥' },
+        { name: 'Tickets', path: '/organisersdashboard/tickets', icon: '🎫' },
+        { name: 'Announcements', path: '/organisersdashboard/announcements', icon: '📢' },
+        { name: 'Emails', path: '/organisersdashboard/emails', icon: '📧' },
     ];
 
     return (

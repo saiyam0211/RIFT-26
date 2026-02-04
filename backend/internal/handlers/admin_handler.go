@@ -378,13 +378,13 @@ func (h *AdminHandler) BulkUploadTeams(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{
-		"message":        "Bulk upload completed",
-		"success_count":  successCount,
-		"error_count":    errorCount,
-		"skipped_count":  skippedCount,
-		"total_teams":    len(teamsMap),
-		"errors":         errors,
-		"warnings":       warnings,
+		"message":       "Bulk upload completed",
+		"success_count": successCount,
+		"error_count":   errorCount,
+		"skipped_count": skippedCount,
+		"total_teams":   len(teamsMap),
+		"errors":        errors,
+		"warnings":      warnings,
 	})
 }
 

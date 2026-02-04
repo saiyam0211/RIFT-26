@@ -22,7 +22,7 @@ export default function VolunteerScannerPage() {
         // Check authentication
         const token = localStorage.getItem('token')
         if (!token) {
-            router.push('/admin/login')
+            router.push('/organisersdashboard/login')
             return
         }
 

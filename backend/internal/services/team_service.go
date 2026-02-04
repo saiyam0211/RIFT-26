@@ -116,15 +116,45 @@ func (s *TeamService) SubmitRSVP(ctx context.Context, teamID uuid.UUID, city mod
 		return fmt.Errorf("team cannot have more than 4 members")
 	}
 
-	// Validate: must have exactly one leader
+	// Find the team leader in existing members
+	var teamLeader *models.TeamMember
+	for _, em := range team.Members {
+		if em.Role == "leader" {
+			teamLeader = &em
+			break
+		}
+	}
+
+	if teamLeader == nil {
+		return fmt.Errorf("team leader not found")
+	}
+
+	// Validate: must have exactly one leader in updates
 	leaderCount := 0
-	for _, update := range memberUpdates {
-		// Check if this is an existing member by checking if ID exists in team
-		for _, existingMember := range team.Members {
-			if existingMember.ID == update.ID && existingMember.Role == "leader" {
-				leaderCount++
-				break
-			}
+	var leaderUpdate *models.TeamMemberUpdate
+	for i := range memberUpdates {
+		update := &memberUpdates[i]
+		if update.ID == teamLeader.ID {
+			leaderCount++
+			leaderUpdate = update
+			break
+		}
+	}
+
+	if leaderCount == 0 {
+		return fmt.Errorf("team leader must be included in RSVP")
+	}
+
+	// Validate: Team leader details cannot be changed
+	if leaderUpdate != nil {
+		if !strings.EqualFold(leaderUpdate.Name, teamLeader.Name) {
+			return fmt.Errorf("team leader name cannot be changed")
+		}
+		if !strings.EqualFold(leaderUpdate.Email, teamLeader.Email) {
+			return fmt.Errorf("team leader email cannot be changed")
+		}
+		if leaderUpdate.Phone != teamLeader.Phone {
+			return fmt.Errorf("team leader phone cannot be changed")
 		}
 	}
 
@@ -143,10 +173,20 @@ func (s *TeamService) SubmitRSVP(ctx context.Context, teamID uuid.UUID, city mod
 		if existingMember != nil {
 			// Update existing member
 			updatedMember := *existingMember
-			updatedMember.Name = update.Name
-			updatedMember.Email = update.Email
-			updatedMember.Phone = update.Phone
-			updatedMember.TShirtSize = update.TShirtSize
+			
+			// For team leader, keep original details (no changes allowed)
+			if existingMember.Role == "leader" {
+				updatedMember.Name = existingMember.Name
+				updatedMember.Email = existingMember.Email
+				updatedMember.Phone = existingMember.Phone
+				updatedMember.TShirtSize = update.TShirtSize // Only allow t-shirt size update
+			} else {
+				// For regular members, allow updates
+				updatedMember.Name = update.Name
+				updatedMember.Email = update.Email
+				updatedMember.Phone = update.Phone
+				updatedMember.TShirtSize = update.TShirtSize
+			}
 			updatedMembers = append(updatedMembers, updatedMember)
 		} else {
 			// Create new member
@@ -166,11 +206,6 @@ func (s *TeamService) SubmitRSVP(ctx context.Context, teamID uuid.UUID, city mod
 			}
 			updatedMembers = append(updatedMembers, newMember)
 		}
-	}
-
-	// Ensure we still have the team leader
-	if leaderCount == 0 {
-		return fmt.Errorf("team must have a leader")
 	}
 
 	// Update RSVP in database (this locks the team)

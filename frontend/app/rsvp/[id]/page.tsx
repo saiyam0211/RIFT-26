@@ -300,7 +300,7 @@ export default function RSVPPage() {
                             
                             <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
                                 <p className="text-blue-200 text-sm">
-                                    ℹ️ Team leader cannot be removed or have their name changed. You can add/remove other members and update contact details.
+                                    ℹ️ Team leader details (name, email, phone) are locked and cannot be changed. You can add/remove other members and update their contact details.
                                 </p>
                             </div>
 
@@ -341,6 +341,8 @@ export default function RSVPPage() {
                                                 value={member.email}
                                                 onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
                                                 placeholder="Email Address"
+                                                disabled={index === 0}
+                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
 
@@ -352,6 +354,8 @@ export default function RSVPPage() {
                                                 onChange={(e) => handleMemberChange(index, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
                                                 placeholder="Phone Number (10 digits)"
                                                 maxLength={10}
+                                                disabled={index === 0}
+                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
                                     </div>

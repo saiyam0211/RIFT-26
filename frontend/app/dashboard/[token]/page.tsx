@@ -199,14 +199,7 @@ export default function DashboardPage() {
                 </button>
 
                 {/* Raise Ticket - Only for Leaders */}
-                {isLeader() && (
-                    <button
-                        onClick={() => setShowTicketModal(true)}
-                        className="bg-[#c0211f]/10 hover:bg-[#c0211f]/20 border border-[#c0211f]/30 p-3 rounded-full transition group"
-                    >
-                        <Ticket className="text-[#c0211f] group-hover:text-white" size={20} />
-                    </button>
-                )}
+                
             </div>
 
             {/* QR Code Modal */}
@@ -439,7 +432,7 @@ export default function DashboardPage() {
                                     <li>• Reporting time will be shared via email</li>
                                     <li>• Save this dashboard link for easy access</li>
                                     <li>• Check announcements regularly for updates</li>
-                                    {isLeader() && <li>• Leaders can raise tickets for any queries</li>}
+                                    {/* {isLeader() && <li>• Leaders can raise tickets for any queries</li>} */}
                                 </ul>
                             </div>
                         </div>
