@@ -1,0 +1,18 @@
+# robots.txt for RIFT '26 Hackathon
+# Website: https://rift.pwioi.com
+# Instagram: @rift.pwioi
+
+User-agent: *
+Allow: /
+Allow: /rsvp/
+Allow: /dashboard/
+
+# Disallow admin and volunteer pages from search engines
+Disallow: /admin/
+Disallow: /volunteer/
+
+# Sitemap
+Sitemap: https://rift.pwioi.com/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1

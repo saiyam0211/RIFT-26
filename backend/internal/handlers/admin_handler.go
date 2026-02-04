@@ -205,8 +205,9 @@ func (h *AdminHandler) BulkUploadTeams(c *gin.Context) {
 		}
 	}
 
-	var successCount, errorCount int
+	var successCount, errorCount, skippedCount int
 	var errors []string
+	var warnings []string
 
 	// Use transaction for batch insert
 	ctx := c.Request.Context()
@@ -230,6 +231,97 @@ func (h *AdminHandler) BulkUploadTeams(c *gin.Context) {
 			teamName = "Team " + teamID
 		}
 
+		// Determine leader (first candidate with "leader" in User Type, or first candidate)
+		leaderIndex := 0
+		for i, candidate := range candidates {
+			if strings.Contains(strings.ToLower(candidate.UserType), "leader") {
+				leaderIndex = i
+				break
+			}
+		}
+
+		leaderEmail := candidates[leaderIndex].Email
+
+		// VALIDATION 1: Check if team with same name and leader already exists
+		existingTeam, err := h.teamRepo.CheckTeamExistsByNameAndLeader(ctx, teamName, leaderEmail)
+		if err != nil {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Team %s: Failed to validate - %v", teamName, err))
+			continue
+		}
+		if existingTeam != nil {
+			skippedCount++
+			rsvpStatus := "not done"
+			if existingTeam.RSVPLocked {
+				rsvpStatus = "done"
+			}
+			warnings = append(warnings, fmt.Sprintf("Team '%s' with leader '%s' already exists (RSVP: %s) - Skipped", teamName, leaderEmail, rsvpStatus))
+			continue
+		}
+
+		// VALIDATION 2: Check for duplicate phone numbers and emails in CSV and database
+		validationFailed := false
+		var validationErrors []string
+
+		for i, candidate := range candidates {
+			// Clean phone number
+			phone := strings.TrimSpace(strings.TrimPrefix(candidate.Mobile, "+91"))
+
+			// Skip empty phone/email
+			if phone == "" || candidate.Email == "" {
+				validationFailed = true
+				validationErrors = append(validationErrors, fmt.Sprintf("Member %s has empty phone or email", candidate.Name))
+				continue
+			}
+
+			// Check if phone exists in database
+			phoneExists, existingTeamName, err := h.teamRepo.CheckPhoneExists(ctx, phone)
+			if err != nil {
+				validationFailed = true
+				validationErrors = append(validationErrors, fmt.Sprintf("Failed to validate phone %s: %v", phone, err))
+				continue
+			}
+			if phoneExists {
+				validationFailed = true
+				validationErrors = append(validationErrors, fmt.Sprintf("Phone %s (member: %s) already exists in team '%s'", phone, candidate.Name, existingTeamName))
+				continue
+			}
+
+			// Check if email exists in database
+			emailExists, existingTeamName, err := h.teamRepo.CheckEmailExists(ctx, candidate.Email)
+			if err != nil {
+				validationFailed = true
+				validationErrors = append(validationErrors, fmt.Sprintf("Failed to validate email %s: %v", candidate.Email, err))
+				continue
+			}
+			if emailExists {
+				validationFailed = true
+				validationErrors = append(validationErrors, fmt.Sprintf("Email %s (member: %s) already exists in team '%s'", candidate.Email, candidate.Name, existingTeamName))
+				continue
+			}
+
+			// Check for duplicates within the same CSV upload
+			for j := i + 1; j < len(candidates); j++ {
+				otherPhone := strings.TrimSpace(strings.TrimPrefix(candidates[j].Mobile, "+91"))
+
+				if phone == otherPhone {
+					validationFailed = true
+					validationErrors = append(validationErrors, fmt.Sprintf("Duplicate phone %s within team (members: %s and %s)", phone, candidate.Name, candidates[j].Name))
+				}
+
+				if strings.EqualFold(candidate.Email, candidates[j].Email) {
+					validationFailed = true
+					validationErrors = append(validationErrors, fmt.Sprintf("Duplicate email %s within team (members: %s and %s)", candidate.Email, candidate.Name, candidates[j].Name))
+				}
+			}
+		}
+
+		if validationFailed {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Team %s: %s", teamName, strings.Join(validationErrors, "; ")))
+			continue
+		}
+
 		// Map city from CSV
 		cityName := teamCities[teamID]
 		city := mapCity(cityName)
@@ -244,15 +336,6 @@ func (h *AdminHandler) BulkUploadTeams(c *gin.Context) {
 			MemberCount: len(candidates),
 		}
 
-		// Determine leader (first candidate with "leader" in User Type, or first candidate)
-		leaderIndex := 0
-		for i, candidate := range candidates {
-			if strings.Contains(strings.ToLower(candidate.UserType), "leader") {
-				leaderIndex = i
-				break
-			}
-		}
-
 		// Prepare team members
 		var members []models.TeamMember
 		for i, candidate := range candidates {
@@ -263,12 +346,8 @@ func (h *AdminHandler) BulkUploadTeams(c *gin.Context) {
 				role = "member"
 			}
 
-			// Clean phone number - only remove first 3 characters (+91)
-			phone := candidate.Mobile
-			if strings.HasPrefix(phone, "+91") {
-				phone = phone[3:] // Remove first 3 characters: +91
-			}
-			phone = strings.TrimSpace(phone)
+			// Clean phone number - remove +91 prefix if present
+			phone := strings.TrimSpace(strings.TrimPrefix(candidate.Mobile, "+91"))
 
 			member := models.TeamMember{
 				ID:     uuid.New(),
@@ -299,11 +378,13 @@ func (h *AdminHandler) BulkUploadTeams(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{
-		"message":       "Bulk upload completed",
-		"success_count": successCount,
-		"error_count":   errorCount,
-		"total_teams":   len(teamsMap),
-		"errors":        errors,
+		"message":        "Bulk upload completed",
+		"success_count":  successCount,
+		"error_count":    errorCount,
+		"skipped_count":  skippedCount,
+		"total_teams":    len(teamsMap),
+		"errors":         errors,
+		"warnings":       warnings,
 	})
 }
 

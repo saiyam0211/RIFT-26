@@ -483,3 +483,67 @@ func (r *TeamRepository) ClearAllData(ctx context.Context) error {
 
 	return nil
 }
+
+// CheckPhoneExists checks if a phone number already exists in the database
+func (r *TeamRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, string, error) {
+	query := `
+		SELECT tm.phone, t.team_name 
+		FROM team_members tm
+		JOIN teams t ON tm.team_id = t.id
+		WHERE tm.phone = $1
+		LIMIT 1
+	`
+	var existingPhone, teamName string
+	err := r.db.QueryRowContext(ctx, query, phone).Scan(&existingPhone, &teamName)
+	if err == sql.ErrNoRows {
+		return false, "", nil
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("failed to check phone existence: %w", err)
+	}
+	return true, teamName, nil
+}
+
+// CheckEmailExists checks if an email already exists in the database
+func (r *TeamRepository) CheckEmailExists(ctx context.Context, email string) (bool, string, error) {
+	query := `
+		SELECT tm.email, t.team_name 
+		FROM team_members tm
+		JOIN teams t ON tm.team_id = t.id
+		WHERE LOWER(tm.email) = LOWER($1)
+		LIMIT 1
+	`
+	var existingEmail, teamName string
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&existingEmail, &teamName)
+	if err == sql.ErrNoRows {
+		return false, "", nil
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("failed to check email existence: %w", err)
+	}
+	return true, teamName, nil
+}
+
+// CheckTeamExistsByNameAndLeader checks if a team with the same name and leader email exists
+func (r *TeamRepository) CheckTeamExistsByNameAndLeader(ctx context.Context, teamName, leaderEmail string) (*models.Team, error) {
+	query := `
+		SELECT t.id, t.team_name, t.city, t.status, t.rsvp_locked, t.created_at
+		FROM teams t
+		JOIN team_members tm ON t.id = tm.team_id
+		WHERE LOWER(t.team_name) = LOWER($1) 
+		AND LOWER(tm.email) = LOWER($2)
+		AND tm.role = 'leader'
+		LIMIT 1
+	`
+	var team models.Team
+	err := r.db.QueryRowContext(ctx, query, teamName, leaderEmail).Scan(
+		&team.ID, &team.TeamName, &team.City, &team.Status, &team.RSVPLocked, &team.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to check team existence: %w", err)
+	}
+	return &team, nil
+}
