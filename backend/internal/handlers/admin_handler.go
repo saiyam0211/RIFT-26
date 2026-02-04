@@ -497,5 +497,208 @@ func (h *AdminHandler) GetAllTeams(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"teams": teams, "count": len(teams)})
+	// Transform teams to include checked_in boolean
+	type TeamResponse struct {
+		ID               string                `json:"id"`
+		TeamName         string                `json:"team_name"`
+		City             *models.City          `json:"city"`
+		Status           models.TeamStatus     `json:"status"`
+		ProblemStatement *string               `json:"problem_statement"`
+		QRCodeToken      *string               `json:"qr_code_token"`
+		RSVPLocked       bool                  `json:"rsvp_locked"`
+		RSVPLockedAt     *string               `json:"rsvp_locked_at"`
+		CheckedIn        bool                  `json:"checked_in"`
+		CheckedInAt      *string               `json:"checked_in_at"`
+		CheckedInBy      *string               `json:"checked_in_by"`
+		DashboardToken   *string               `json:"dashboard_token"`
+		MemberCount      int                   `json:"member_count"`
+		CreatedAt        string                `json:"created_at"`
+		UpdatedAt        string                `json:"updated_at"`
+		Members          []models.TeamMember   `json:"members,omitempty"`
+	}
+
+	var response []TeamResponse
+	for _, team := range teams {
+		tr := TeamResponse{
+			ID:               team.ID.String(),
+			TeamName:         team.TeamName,
+			City:             team.City,
+			Status:           team.Status,
+			ProblemStatement: team.ProblemStatement,
+			QRCodeToken:      team.QRCodeToken,
+			RSVPLocked:       team.RSVPLocked,
+			CheckedIn:        team.CheckedInAt != nil,
+			DashboardToken:   team.DashboardToken,
+			MemberCount:      team.MemberCount,
+			CreatedAt:        team.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:        team.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Members:          team.Members,
+		}
+
+		if team.RSVPLockedAt != nil {
+			formatted := team.RSVPLockedAt.Format("2006-01-02T15:04:05Z07:00")
+			tr.RSVPLockedAt = &formatted
+		}
+
+		if team.CheckedInAt != nil {
+			formatted := team.CheckedInAt.Format("2006-01-02T15:04:05Z07:00")
+			tr.CheckedInAt = &formatted
+		}
+
+		if team.CheckedInBy != nil {
+			checkedInBy := team.CheckedInBy.String()
+			tr.CheckedInBy = &checkedInBy
+		}
+
+		response = append(response, tr)
+	}
+
+	c.JSON(200, gin.H{"teams": response, "count": len(response)})
+}
+
+// CreateTeamManually creates a new team with members directly (admin only)
+// POST /api/v1/admin/teams/create
+func (h *AdminHandler) CreateTeamManually(c *gin.Context) {
+	var req struct {
+		TeamName      string `json:"team_name" binding:"required"`
+		City          string `json:"city"`
+		RSVPCompleted bool   `json:"rsvp_completed"`
+		Members       []struct {
+			Name  string `json:"name" binding:"required"`
+			Email string `json:"email" binding:"required,email"`
+			Phone string `json:"phone" binding:"required"`
+			Role  string `json:"role" binding:"required,oneof=leader member"`
+		} `json:"members" binding:"required,min=2,max=4"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Invalid request: %v", err)})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// Validate exactly one leader
+	leaderCount := 0
+	for _, member := range req.Members {
+		if member.Role == "leader" {
+			leaderCount++
+		}
+	}
+	if leaderCount != 1 {
+		c.JSON(400, gin.H{"error": "Team must have exactly one leader"})
+		return
+	}
+
+	// Check for duplicate emails within the team
+	emailMap := make(map[string]bool)
+	for _, member := range req.Members {
+		emailLower := strings.ToLower(member.Email)
+		if emailMap[emailLower] {
+			c.JSON(400, gin.H{"error": fmt.Sprintf("Duplicate email in team: %s", member.Email)})
+			return
+		}
+		emailMap[emailLower] = true
+	}
+
+	// Check for duplicate phones within the team
+	phoneMap := make(map[string]bool)
+	for _, member := range req.Members {
+		phone := strings.TrimSpace(strings.TrimPrefix(member.Phone, "+91"))
+		if phoneMap[phone] {
+			c.JSON(400, gin.H{"error": fmt.Sprintf("Duplicate phone in team: %s", phone)})
+			return
+		}
+		phoneMap[phone] = true
+	}
+
+	// Check if any email already exists in database
+	for _, member := range req.Members {
+		exists, existingTeam, err := h.teamRepo.CheckEmailExists(ctx, member.Email)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to validate email"})
+			return
+		}
+		if exists {
+			c.JSON(400, gin.H{"error": fmt.Sprintf("Email %s already exists in team '%s'", member.Email, existingTeam)})
+			return
+		}
+	}
+
+	// Check if any phone already exists in database
+	for _, member := range req.Members {
+		phone := strings.TrimSpace(strings.TrimPrefix(member.Phone, "+91"))
+		exists, existingTeam, err := h.teamRepo.CheckPhoneExists(ctx, phone)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to validate phone"})
+			return
+		}
+		if exists {
+			c.JSON(400, gin.H{"error": fmt.Sprintf("Phone %s already exists in team '%s'", phone, existingTeam)})
+			return
+		}
+	}
+
+	// Map city
+	var city *models.City
+	if req.City != "" {
+		mappedCity := mapCity(req.City)
+		city = mappedCity
+	}
+
+	// Create team
+	teamID := uuid.New()
+	team := models.Team{
+		ID:          teamID,
+		TeamName:    req.TeamName,
+		City:        city,
+		Status:      "shortlisted",
+		MemberCount: len(req.Members),
+		RSVPLocked:  req.RSVPCompleted,
+	}
+
+	// Generate dashboard token
+	dashboardToken := uuid.New().String()
+	team.DashboardToken = &dashboardToken
+
+	// Prepare team members
+	var teamMembers []models.TeamMember
+	for _, member := range req.Members {
+		phone := strings.TrimSpace(strings.TrimPrefix(member.Phone, "+91"))
+		
+		var role models.MemberRole
+		if member.Role == "leader" {
+			role = models.RoleLeader
+		} else {
+			role = models.RoleMember
+		}
+
+		// Generate individual QR token
+		individualQR := uuid.New().String()
+
+		teamMember := models.TeamMember{
+			ID:                uuid.New(),
+			TeamID:            teamID,
+			Name:              member.Name,
+			Email:             member.Email,
+			Phone:             phone,
+			Role:              role,
+			IndividualQRToken: &individualQR,
+		}
+		teamMembers = append(teamMembers, teamMember)
+	}
+
+	// Create team with members
+	err := h.teamRepo.CreateTeamWithMembers(ctx, team, teamMembers)
+	if err != nil {
+		c.JSON(500, gin.H{"error": fmt.Sprintf("Failed to create team: %v", err)})
+		return
+	}
+
+	c.JSON(201, gin.H{
+		"message":         "Team created successfully",
+		"team_id":         teamID.String(),
+		"dashboard_token": dashboardToken,
+		"rsvp_required":   !req.RSVPCompleted,
+	})
 }

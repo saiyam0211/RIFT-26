@@ -412,7 +412,7 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
 		       rsvp_locked, rsvp_locked_at, checked_in_at, checked_in_by,
-		       dashboard_token, created_at, updated_at
+		       dashboard_token, member_count, created_at, updated_at
 		FROM teams
 		WHERE 1=1
 	`
@@ -446,7 +446,7 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 			&team.ID, &team.TeamName, &team.City, &team.Status,
 			&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
 			&team.RSVPLockedAt, &team.CheckedInAt, &team.CheckedInBy,
-			&team.DashboardToken, &team.CreatedAt, &team.UpdatedAt,
+			&team.DashboardToken, &team.MemberCount, &team.CreatedAt, &team.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan team: %w", err)
@@ -454,7 +454,53 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 		teams = append(teams, team)
 	}
 
+	// Load members for each team
+	for i := range teams {
+		members, err := r.GetTeamMembers(ctx, teams[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load members for team %s: %w", teams[i].ID, err)
+		}
+		teams[i].Members = members
+	}
+
 	return teams, nil
+}
+
+// GetTeamMembers retrieves all members for a specific team
+func (r *TeamRepository) GetTeamMembers(ctx context.Context, teamID uuid.UUID) ([]models.TeamMember, error) {
+	query := `
+		SELECT id, team_id, name, email, phone, role, individual_qr_token, 
+		       tshirt_size, created_at, updated_at
+		FROM team_members
+		WHERE team_id = $1
+		ORDER BY role DESC, created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query team members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []models.TeamMember
+	for rows.Next() {
+		var member models.TeamMember
+		err := rows.Scan(
+			&member.ID, &member.TeamID, &member.Name, &member.Email,
+			&member.Phone, &member.Role, &member.IndividualQRToken,
+			&member.TShirtSize, &member.CreatedAt, &member.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan team member: %w", err)
+		}
+		members = append(members, member)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating team members: %w", err)
+	}
+
+	return members, nil
 }
 
 // CreateTeamWithMembers creates a team and its members in a single transaction

@@ -49,6 +49,11 @@ type Team struct {
 	Members          []TeamMember `json:"members,omitempty"`
 }
 
+// CheckedIn returns true if the team has been checked in
+func (t *Team) CheckedIn() bool {
+	return t.CheckedInAt != nil
+}
+
 type TeamMember struct {
 	ID                uuid.UUID  `json:"id" db:"id"`
 	TeamID            uuid.UUID  `json:"team_id" db:"team_id"`

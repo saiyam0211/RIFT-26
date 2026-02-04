@@ -134,6 +134,7 @@ func main() {
 		adminRoutes.Use(middleware.RoleMiddleware("admin"))
 		{
 			// Teams
+			adminRoutes.POST("/teams/create", adminHandler.CreateTeamManually)
 			adminRoutes.POST("/teams/bulk-upload", adminHandler.BulkUploadTeams)
 			adminRoutes.GET("/teams", adminHandler.GetAllTeams)
 			adminRoutes.DELETE("/data/clear", adminHandler.ClearAllData)
