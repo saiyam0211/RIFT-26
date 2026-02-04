@@ -17,24 +17,30 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organisersdashboard/login`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/admin/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data.error || 'Login failed');
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Login failed');
+                } else {
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
             }
+
+            const data = await response.json();
 
             // Store token and user
             setAdminToken(data.token);
             setAdminUser(data.user);
 
             // Redirect to dashboard
-            router.push('/admin/dashboard');
+            router.push('/organisersdashboard/dashboard');
         } catch (err: any) {
             setError(err.message || 'Login failed');
         } finally {
@@ -67,7 +73,7 @@ export default function AdminLogin() {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="admin@rift.com"
+                            placeholder="admin@shift.com"
                         />
                     </div>
 
