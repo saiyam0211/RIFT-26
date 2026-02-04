@@ -386,7 +386,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right Side - Details */}
-            <div className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center mt-0 md:mt-40 py-8 lg:py-12">
+            <div className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center mt-0 md:mt-32 py-8 lg:py-12">
                 <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
 
                     {/* Team Members */}

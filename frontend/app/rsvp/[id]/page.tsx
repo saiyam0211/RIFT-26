@@ -162,7 +162,7 @@ export default function RSVPPage() {
             <RIFTBackground />
 
             {/* Left Side - Fixed Title and Steps */}
-            <div className="w-full lg:w-1/2 flex flex-col justify-center  mt-20 px-28 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
+            <div className="w-full lg:w-1/2 flex flex-col justify-center md:mt-0  mt-20 px-28 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
                 <div className="space-y-8 lg:space-y-12">
                     {/* Title */}
                     <div className="text-center md:text-left">
@@ -229,7 +229,7 @@ export default function RSVPPage() {
             </div>
 
             {/* Right Side - RSVP Content */}
-            <div className="w-full lg:w-1/2 lg:ml-auto flex items-center justify-center min-h-screen py-8 -mt-80 lg:py-12">
+            <div className="w-full lg:w-1/2 lg:ml-auto flex items-center justify-center min-h-screen py-8 -mt-80 md:mt-0 lg:py-12">
                 <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
 
                     {/* Step 1: Edit Members Question */}
@@ -263,7 +263,7 @@ export default function RSVPPage() {
 
                     {/* Step 2: Edit Members Form */}
                     {step === 'edit_members' && (
-                        <div className="mt-72 space-y-6">
+                        <div className="mt-72 md:mt-0 space-y-6">
                             <button
                                 onClick={() => {
                                     setError('')
@@ -457,7 +457,7 @@ export default function RSVPPage() {
 
                     {/* Step 4: Review */}
                     {step === 'review' && (
-                        <div className='mt-72 space-y-6'>
+                        <div className='mt-72 md:mt-0 space-y-6'>
                             <button
                                 onClick={() => setStep('city_question')}
                                 className="text-sm text-gray-400 hover:text-white flex items-center gap-2"

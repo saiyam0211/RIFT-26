@@ -90,7 +90,7 @@ export default function Home() {
             });
 
             console.log('Response:', response.data);
-            
+
             // Check if OTP is enabled on backend
             const requiresOtp = response.data.otp_enabled !== false && response.data.requires_otp !== false;
             setOtpEnabled(requiresOtp);
@@ -444,7 +444,7 @@ export default function Home() {
 
                     {/* Email Input Step */}
                     {step === 'email' && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 mt-20 md:justify-center">
                             <button
                                 onClick={() => setStep('search')}
                                 className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
