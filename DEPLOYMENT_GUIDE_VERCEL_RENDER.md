@@ -7,6 +7,9 @@ This guide deploys the RIFT stack using modern PaaS providers. This is easier to
 - **Backend**: Render (Go Service)
 - **Frontend**: Vercel (Next.js)
 
+
+
+
 ---
 
 ## 🟢 PART 1: Database (Neon DB)
