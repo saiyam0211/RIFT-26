@@ -17,7 +17,8 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/admin/login`, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+            const response = await fetch(`${apiUrl}/admin/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
