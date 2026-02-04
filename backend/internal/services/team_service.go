@@ -108,24 +108,69 @@ func (s *TeamService) SubmitRSVP(ctx context.Context, teamID uuid.UUID, city mod
 		return fmt.Errorf("at least one member required")
 	}
 
-	// Map updates to team members
-	var updatedMembers []models.TeamMember
+	// Validate: must have 2-4 members
+	if len(memberUpdates) < 2 {
+		return fmt.Errorf("team must have at least 2 members")
+	}
+	if len(memberUpdates) > 4 {
+		return fmt.Errorf("team cannot have more than 4 members")
+	}
+
+	// Validate: must have exactly one leader
+	leaderCount := 0
 	for _, update := range memberUpdates {
-		// Find corresponding member in team
-		var found bool
+		// Check if this is an existing member by checking if ID exists in team
 		for _, existingMember := range team.Members {
-			if existingMember.ID == update.ID {
-				existingMember.Name = update.Name
-				existingMember.Email = update.Email
-				existingMember.Phone = update.Phone
-				updatedMembers = append(updatedMembers, existingMember)
-				found = true
+			if existingMember.ID == update.ID && existingMember.Role == "leader" {
+				leaderCount++
 				break
 			}
 		}
-		if !found {
-			return fmt.Errorf("member ID %s not found in team", update.ID)
+	}
+
+	// Map updates to team members (support both existing and new members)
+	var updatedMembers []models.TeamMember
+	for i, update := range memberUpdates {
+		// Check if this is an existing member
+		var existingMember *models.TeamMember
+		for _, em := range team.Members {
+			if em.ID == update.ID {
+				existingMember = &em
+				break
+			}
 		}
+
+		if existingMember != nil {
+			// Update existing member
+			updatedMember := *existingMember
+			updatedMember.Name = update.Name
+			updatedMember.Email = update.Email
+			updatedMember.Phone = update.Phone
+			updatedMember.TShirtSize = update.TShirtSize
+			updatedMembers = append(updatedMembers, updatedMember)
+		} else {
+			// Create new member
+			// Validate required fields for new members
+			if update.Name == "" || update.Email == "" || update.Phone == "" {
+				return fmt.Errorf("new member %d must have name, email, and phone", i+1)
+			}
+
+			newMember := models.TeamMember{
+				ID:         uuid.New(), // Generate new UUID for new member
+				TeamID:     teamID,
+				Name:       update.Name,
+				Email:      update.Email,
+				Phone:      update.Phone,
+				Role:       "member", // New members are always regular members
+				TShirtSize: update.TShirtSize,
+			}
+			updatedMembers = append(updatedMembers, newMember)
+		}
+	}
+
+	// Ensure we still have the team leader
+	if leaderCount == 0 {
+		return fmt.Errorf("team must have a leader")
 	}
 
 	// Update RSVP in database (this locks the team)

@@ -204,6 +204,7 @@ func (r *TeamRepository) GetLeaderPhone(ctx context.Context, teamID uuid.UUID) (
 }
 
 // UpdateRSVP confirms RSVP and locks the team (transaction-wrapped)
+// This method handles adding new members, updating existing members, and deleting removed members
 func (r *TeamRepository) UpdateRSVP(ctx context.Context, teamID uuid.UUID, city models.City, members []models.TeamMember) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -215,29 +216,72 @@ func (r *TeamRepository) UpdateRSVP(ctx context.Context, teamID uuid.UUID, city 
 	qrToken := uuid.New().String()
 	dashboardToken := uuid.New().String()
 
-	// Update team
+	// Update team with new member count
 	_, err = tx.ExecContext(ctx, `
 		UPDATE teams SET
 		    city = $1, status = 'rsvp_done', qr_code_token = $2,
 		    rsvp_locked = true, rsvp_locked_at = NOW(),
-		    dashboard_token = $3, updated_at = NOW()
-		WHERE id = $4
-	`, city, qrToken, dashboardToken, teamID)
+		    dashboard_token = $3, member_count = $4, updated_at = NOW()
+		WHERE id = $5
+	`, city, qrToken, dashboardToken, len(members), teamID)
 	if err != nil {
 		return fmt.Errorf("failed to update team: %w", err)
 	}
 
-	// Update members
+	// Get existing member IDs to determine which ones to delete
+	existingMemberIDs := make(map[uuid.UUID]bool)
+	rows, err := tx.QueryContext(ctx, `SELECT id FROM team_members WHERE team_id = $1`, teamID)
+	if err != nil {
+		return fmt.Errorf("failed to get existing members: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return fmt.Errorf("failed to scan member ID: %w", err)
+		}
+		existingMemberIDs[id] = true
+	}
+
+	// Track which members are in the update
+	updatedMemberIDs := make(map[uuid.UUID]bool)
+
+	// Insert or update members
 	for _, member := range members {
 		individualQR := uuid.New().String()
-		_, err = tx.ExecContext(ctx, `
-			UPDATE team_members SET
-			    name = $1, email = $2, phone = $3, tshirt_size = $4,
-			    individual_qr_token = $5, updated_at = NOW()
-			WHERE id = $6
-		`, member.Name, member.Email, member.Phone, member.TShirtSize, individualQR, member.ID)
-		if err != nil {
-			return fmt.Errorf("failed to update member: %w", err)
+		updatedMemberIDs[member.ID] = true
+
+		if existingMemberIDs[member.ID] {
+			// Update existing member
+			_, err = tx.ExecContext(ctx, `
+				UPDATE team_members SET
+				    name = $1, email = $2, phone = $3, tshirt_size = $4,
+				    individual_qr_token = $5, updated_at = NOW()
+				WHERE id = $6
+			`, member.Name, member.Email, member.Phone, member.TShirtSize, individualQR, member.ID)
+			if err != nil {
+				return fmt.Errorf("failed to update member %s: %w", member.Name, err)
+			}
+		} else {
+			// Insert new member
+			_, err = tx.ExecContext(ctx, `
+				INSERT INTO team_members (id, team_id, name, email, phone, role, tshirt_size, individual_qr_token)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			`, member.ID, member.TeamID, member.Name, member.Email, member.Phone, member.Role, member.TShirtSize, individualQR)
+			if err != nil {
+				return fmt.Errorf("failed to insert new member %s: %w", member.Name, err)
+			}
+		}
+	}
+
+	// Delete members that were removed
+	for existingID := range existingMemberIDs {
+		if !updatedMemberIDs[existingID] {
+			_, err = tx.ExecContext(ctx, `DELETE FROM team_members WHERE id = $1`, existingID)
+			if err != nil {
+				return fmt.Errorf("failed to delete removed member: %w", err)
+			}
 		}
 	}
 

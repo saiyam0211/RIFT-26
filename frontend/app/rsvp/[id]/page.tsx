@@ -69,16 +69,35 @@ export default function RSVPPage() {
     }
 
     const addMember = () => {
-        if (members.length >= 4) return
+        if (members.length >= 4) {
+            setError('Maximum 4 members allowed')
+            return
+        }
+        // Generate a valid UUID v4 for new member
+        const newUUID = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
         setMembers([
             ...members,
-            { id: `temp-${Date.now()}`, name: '', email: '', phone: '', role: 'member' },
+            { id: newUUID, name: '', email: '', phone: '', role: 'member' },
         ])
+        setError('')
     }
 
     const removeMember = (index: number) => {
-        if (members.length <= 2 || index === 0) return
+        // Cannot remove team leader (index 0)
+        if (index === 0) {
+            setError('Cannot remove team leader')
+            return
+        }
+        // Must have at least 2 members
+        if (members.length <= 2) {
+            setError('Team must have at least 2 members')
+            return
+        }
         setMembers(members.filter((_, i) => i !== index))
+        setError('')
     }
 
     const handleMemberChange = (index: number, field: string, value: string) => {
@@ -237,10 +256,13 @@ export default function RSVPPage() {
                         <>
                             <div className="text-center space-y-6">
                                 <h2 className="text-white text-3xl font-semibold">
-                                    Do you want to edit team member details?
+                                    Do you want to edit team members?
                                 </h2>
                                 <p className="text-gray-400">
-                                    Current members: {members.length} (You can have 2-4 members)
+                                    Current members: {members.length} (2-4 members allowed)
+                                </p>
+                                <p className="text-gray-500 text-sm">
+                                    You can add new members, remove members, or update contact details
                                 </p>
 
                                 <div className="grid grid-cols-2 gap-4 mt-8">
@@ -275,20 +297,28 @@ export default function RSVPPage() {
                             </button>
 
                             <h2 className="text-white text-2xl font-semibold">Edit Team Members</h2>
-
+                            
+                            <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
+                                <p className="text-blue-200 text-sm">
+                                    ℹ️ Team leader cannot be removed or have their name changed. You can add/remove other members and update contact details.
+                                </p>
+                            </div>
 
                             <div className="space-y-4">
                                 {members.map((member, index) => (
                                     <div key={member.id} className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
                                         <div className="flex justify-between items-center">
                                             <h3 className="text-white font-medium">
-                                                {index === 0 ? 'Team Leader' : `Member ${index + 1}`}
+                                                {index === 0 ? '👑 Team Leader' : `Member ${index + 1}`}
                                             </h3>
-                                            {index > 0 && members.length > 2 && (
+                                            {index > 0 && (
                                                 <button
                                                     onClick={() => removeMember(index)}
-                                                    className="text-red-400 cursor-pointer hover:text-red-300 text-sm"
+                                                    className="text-red-400 cursor-pointer hover:text-red-300 text-sm flex items-center gap-1"
                                                 >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
                                                     Remove
                                                 </button>
                                             )}
@@ -311,8 +341,6 @@ export default function RSVPPage() {
                                                 value={member.email}
                                                 onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
                                                 placeholder="Email Address"
-                                                disabled={index === 0}
-                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
 
@@ -324,8 +352,6 @@ export default function RSVPPage() {
                                                 onChange={(e) => handleMemberChange(index, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
                                                 placeholder="Phone Number (10 digits)"
                                                 maxLength={10}
-                                                disabled={index === 0}
-                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
                                             />
                                         </div>
                                     </div>
@@ -334,9 +360,12 @@ export default function RSVPPage() {
                                 {members.length < 4 && (
                                     <button
                                         onClick={addMember}
-                                        className="w-full cursor-pointer py-3 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 transition font-medium"
+                                        className="w-full cursor-pointer py-3 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 transition font-medium flex items-center justify-center gap-2"
                                     >
-                                        + Add Member
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        Add Member ({members.length}/4)
                                     </button>
                                 )}
                             </div>
@@ -366,7 +395,11 @@ export default function RSVPPage() {
                                         }
                                     }
                                     if (members.length < 2) {
-                                        setError('You must have at least 2 team members')
+                                        setError('Team must have at least 2 members')
+                                        return
+                                    }
+                                    if (members.length > 4) {
+                                        setError('Team cannot have more than 4 members')
                                         return
                                     }
                                     setStep('city_question')
@@ -505,7 +538,7 @@ export default function RSVPPage() {
 
                             <button
                                 onClick={handleSubmit}
-                                disabled={submitting || members.length < 2}
+                                disabled={submitting}
                                 className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {submitting ? 'Submitting...' : 'Confirm RSVP & Lock'}
