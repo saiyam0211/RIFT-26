@@ -3,6 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { 
+    LayoutDashboard, 
+    Upload, 
+    Users, 
+    Ticket, 
+    Megaphone, 
+    Mail, 
+    LogOut,
+    User
+} from 'lucide-react';
 import { getAdminToken, getAdminUser, removeAdminToken } from '../../src/lib/admin-auth';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -29,55 +39,88 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     const navItems = [
-        { name: 'Dashboard', path: '/organisersdashboard/dashboard', icon: '📊' },
-        { name: 'Bulk Upload', path: '/organisersdashboard/bulk-upload', icon: '📤' },
-        { name: 'Teams', path: '/organisersdashboard/teams', icon: '👥' },
-        { name: 'Tickets', path: '/organisersdashboard/tickets', icon: '🎫' },
-        { name: 'Announcements', path: '/organisersdashboard/announcements', icon: '📢' },
-        { name: 'Emails', path: '/organisersdashboard/emails', icon: '📧' },
+        { name: 'Dashboard', path: '/organisersdashboard/dashboard', icon: LayoutDashboard },
+        { name: 'Bulk Upload', path: '/organisersdashboard/bulk-upload', icon: Upload },
+        { name: 'Teams', path: '/organisersdashboard/teams', icon: Users },
+        { name: 'Tickets', path: '/organisersdashboard/tickets', icon: Ticket },
+        { name: 'Announcements', path: '/organisersdashboard/announcements', icon: Megaphone },
+        { name: 'Emails', path: '/organisersdashboard/emails', icon: Mail },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 flex">
-            {/* Sidebar */}
-            <aside className="w-64 bg-gradient-to-b from-purple-700 to-purple-900 text-white">
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold">RIFT '26</h1>
-                    <p className="text-purple-200 text-sm">Admin Panel</p>
+        <div className="min-h-screen bg-black flex">
+            {/* Fixed Sidebar */}
+            <aside className="fixed left-0 top-0 h-screen w-64 bg-zinc-950 border-r border-zinc-800 text-white flex flex-col">
+                {/* Logo Section */}
+                <div className="p-6 border-b border-zinc-800">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                            <span className="text-xl font-bold">R</span>
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-white">
+                                RIFT '26
+                            </h1>
+                            <p className="text-zinc-400 text-xs">Admin Panel</p>
+                        </div>
+                    </div>
                 </div>
 
-                <nav className="mt-8">
-                    {navItems.map((item) => (
-                        <Link
-                            key={item.path}
-                            href={item.path}
-                            className={`flex items-center px-6 py-3 hover:bg-purple-800 transition-colors ${pathname === item.path ? 'bg-purple-800 border-l-4 border-white' : ''
-                                }`}
-                        >
-                            <span className="mr-3">{item.icon}</span>
-                            {item.name}
-                        </Link>
-                    ))}
+                {/* Navigation */}
+                <nav className="flex-1 overflow-y-auto py-6 px-3">
+                    <div className="space-y-1">
+                        {navItems.map((item) => {
+                            const Icon = item.icon;
+                            const isActive = pathname === item.path;
+                            return (
+                                <Link
+                                    key={item.path}
+                                    href={item.path}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                                        isActive
+                                            ? 'bg-red-600 text-white'
+                                            : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                                    }`}
+                                >
+                                    <Icon className="w-5 h-5" />
+                                    <span className="font-medium">{item.name}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </nav>
 
+                {/* User Section */}
                 {user && (
-                    <div className="absolute bottom-0 w-64 p-6 border-t border-purple-600">
-                        <div className="text-sm">
-                            <p className="font-semibold">{user.name}</p>
-                            <p className="text-purple-300 text-xs">{user.email}</p>
+                    <div className="p-4 border-t border-zinc-800">
+                        <div className="bg-zinc-900 rounded-lg p-4 mb-3">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center">
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-white truncate">{user.name}</p>
+                                    <p className="text-zinc-400 text-xs truncate">{user.email}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className="w-full bg-red-600 hover:bg-red-700 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                Logout
+                            </button>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="mt-4 w-full bg-purple-800 hover:bg-purple-700 py-2 px-4 rounded-lg text-sm transition-colors"
-                        >
-                            Logout
-                        </button>
                     </div>
                 )}
             </aside>
 
-            {/* Main content */}
-            <main className="flex-1 p-8">{children}</main>
+            {/* Main content with left margin to account for fixed sidebar */}
+            <main className="flex-1 ml-64 overflow-y-auto bg-zinc-950">
+                <div className="p-8">
+                    {children}
+                </div>
+            </main>
         </div>
     );
 }

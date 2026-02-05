@@ -48,6 +48,15 @@ export default function RSVPPage() {
         }
 
         setTeam(authTeam)
+        
+        // Set city to the team's city if it exists, otherwise default to BLR
+        if (authTeam.city) {
+            const teamCity = authTeam.city.toUpperCase() as 'BLR' | 'PUNE' | 'NOIDA' | 'LKO'
+            if (['BLR', 'PUNE', 'NOIDA', 'LKO'].includes(teamCity)) {
+                setCity(teamCity)
+            }
+        }
+        
         const sortedMembers = authTeam.members?.map((m) => ({
             id: m.id,
             name: m.name || '',

@@ -2,6 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { 
+    Users, 
+    CheckCircle, 
+    Ticket, 
+    MapPin, 
+    RefreshCw,
+    TrendingUp,
+    Activity,
+    BarChart3,
+    Upload,
+    UserPlus,
+    Megaphone
+} from 'lucide-react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
 import { TeamStats } from '../../../src/types/admin';
 
@@ -35,7 +48,10 @@ export default function AdminDashboard() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-zinc-800 border-t-red-600"></div>
+                    <p className="text-zinc-400 text-sm">Loading dashboard...</p>
+                </div>
             </div>
         );
     }
@@ -45,18 +61,17 @@ export default function AdminDashboard() {
 
     return (
         <div className="space-y-8">
+            {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-                    <p className="text-gray-600 mt-1">Real-time statistics and insights</p>
+                    <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
+                    <p className="text-zinc-400 mt-1">Real-time statistics and insights</p>
                 </div>
                 <button
                     onClick={fetchStats}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all flex items-center gap-2 shadow-lg"
+                    className="bg-zinc-900 border border-zinc-800 text-white px-4 py-2 rounded-lg hover:bg-zinc-800 transition-all flex items-center gap-2"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <RefreshCw className="w-5 h-5" />
                     Refresh
                 </button>
             </div>
@@ -66,32 +81,28 @@ export default function AdminDashboard() {
                 <StatCard 
                     title="Total Teams" 
                     value={stats?.total_teams || 0} 
-                    icon="👥" 
-                    color="blue"
+                    icon={Users} 
                     subtitle="Registered teams"
                     trend="+12% this week"
                 />
                 <StatCard 
                     title="RSVP Confirmed" 
                     value={stats?.rsvp_confirmed || 0} 
-                    icon="✅" 
-                    color="green"
+                    icon={CheckCircle} 
                     subtitle={`${rsvpPercentage}% completion`}
                     trend={`${stats?.total_teams ? stats.total_teams - stats.rsvp_confirmed : 0} pending`}
                 />
                 <StatCard 
                     title="Checked In" 
                     value={stats?.checked_in || 0} 
-                    icon="🎫" 
-                    color="purple"
+                    icon={Ticket} 
                     subtitle={`${checkinPercentage}% of RSVP`}
                     trend="Live updates"
                 />
                 <StatCard
                     title="Cities"
                     value={Object.keys(stats?.city_distribution || {}).length}
-                    icon="🌍"
-                    color="orange"
+                    icon={MapPin}
                     subtitle="Participating cities"
                     trend="Across India"
                 />
@@ -99,40 +110,50 @@ export default function AdminDashboard() {
 
             {/* Progress Bars */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">RSVP Progress</h3>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-red-600/10 rounded-lg">
+                            <TrendingUp className="w-5 h-5 text-red-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">RSVP Progress</h3>
+                    </div>
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Completed</span>
-                            <span className="font-semibold text-gray-900">{rsvpPercentage}%</span>
+                            <span className="text-zinc-400">Completed</span>
+                            <span className="font-semibold text-white">{rsvpPercentage}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="w-full bg-zinc-800 rounded-full h-3">
                             <div 
-                                className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-500"
+                                className="bg-red-600 h-3 rounded-full transition-all duration-500"
                                 style={{ width: `${rsvpPercentage}%` }}
                             ></div>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 mt-2">
+                        <div className="flex justify-between text-xs text-zinc-500 mt-2">
                             <span>{stats?.rsvp_confirmed || 0} Confirmed</span>
                             <span>{(stats?.total_teams || 0) - (stats?.rsvp_confirmed || 0)} Pending</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Check-in Progress</h3>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-red-600/10 rounded-lg">
+                            <Activity className="w-5 h-5 text-red-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Check-in Progress</h3>
+                    </div>
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Checked In</span>
-                            <span className="font-semibold text-gray-900">{checkinPercentage}%</span>
+                            <span className="text-zinc-400">Checked In</span>
+                            <span className="font-semibold text-white">{checkinPercentage}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="w-full bg-zinc-800 rounded-full h-3">
                             <div 
-                                className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-500"
+                                className="bg-red-600 h-3 rounded-full transition-all duration-500"
                                 style={{ width: `${checkinPercentage}%` }}
                             ></div>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 mt-2">
+                        <div className="flex justify-between text-xs text-zinc-500 mt-2">
                             <span>{stats?.checked_in || 0} Checked In</span>
                             <span>{(stats?.rsvp_confirmed || 0) - (stats?.checked_in || 0)} Remaining</span>
                         </div>
@@ -143,28 +164,35 @@ export default function AdminDashboard() {
             {/* City Distribution */}
             {stats?.city_distribution && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-xl font-semibold mb-6 text-gray-900">Top Cities by Teams</h2>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-red-600/10 rounded-lg">
+                                <BarChart3 className="w-5 h-5 text-red-500" />
+                            </div>
+                            <h2 className="text-xl font-semibold text-white">Top Cities by Teams</h2>
+                        </div>
                         <div className="space-y-4">
                             {Object.entries(stats.city_distribution)
                                 .sort(([, a], [, b]) => (b as number) - (a as number))
                                 .slice(0, 5)
-                                .map(([city, count], index) => {
+                                .map(([city, count]) => {
                                     const maxCount = Math.max(...Object.values(stats.city_distribution || {}) as number[]);
                                     const percentage = ((count as number) / maxCount) * 100;
-                                    const colors = ['bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500'];
                                     
                                     return (
                                         <div key={city}>
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-gray-700 font-medium">{city}</span>
-                                                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-semibold text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <MapPin className="w-4 h-4 text-red-500" />
+                                                    <span className="text-white font-medium">{city}</span>
+                                                </div>
+                                                <span className="bg-zinc-800 text-zinc-300 px-3 py-1 rounded-full font-semibold text-sm">
                                                     {count} teams
                                                 </span>
                                             </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div className="w-full bg-zinc-800 rounded-full h-2">
                                                 <div 
-                                                    className={`${colors[index]} h-2 rounded-full transition-all duration-500`}
+                                                    className="bg-red-600 h-2 rounded-full transition-all duration-500"
                                                     style={{ width: `${percentage}%` }}
                                                 ></div>
                                             </div>
@@ -174,73 +202,65 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-xl font-semibold mb-6 text-gray-900">Quick Actions</h2>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                        <h2 className="text-xl font-semibold mb-6 text-white">Quick Actions</h2>
                         <div className="space-y-3">
                             <button
                                 onClick={() => router.push('/organisersdashboard/teams')}
-                                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 rounded-lg transition-all group"
+                                className="w-full flex items-center justify-between p-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-blue-500 text-white p-2 rounded-lg">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
+                                    <div className="bg-red-600/10 text-red-500 p-2 rounded-lg">
+                                        <Users className="w-5 h-5" />
                                     </div>
-                                    <span className="font-semibold text-gray-900">Manage Teams</span>
+                                    <span className="font-semibold text-white">Manage Teams</span>
                                 </div>
-                                <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
 
                             <button
                                 onClick={() => router.push('/organisersdashboard/teams/add')}
-                                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-lg transition-all group"
+                                className="w-full flex items-center justify-between p-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-green-500 text-white p-2 rounded-lg">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
+                                    <div className="bg-red-600/10 text-red-500 p-2 rounded-lg">
+                                        <UserPlus className="w-5 h-5" />
                                     </div>
-                                    <span className="font-semibold text-gray-900">Add Team Manually</span>
+                                    <span className="font-semibold text-white">Add Team Manually</span>
                                 </div>
-                                <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
 
                             <button
                                 onClick={() => router.push('/organisersdashboard/bulk-upload')}
-                                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 rounded-lg transition-all group"
+                                className="w-full flex items-center justify-between p-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-purple-500 text-white p-2 rounded-lg">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
+                                    <div className="bg-red-600/10 text-red-500 p-2 rounded-lg">
+                                        <Upload className="w-5 h-5" />
                                     </div>
-                                    <span className="font-semibold text-gray-900">Bulk Upload Teams</span>
+                                    <span className="font-semibold text-white">Bulk Upload Teams</span>
                                 </div>
-                                <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
 
                             <button
                                 onClick={() => router.push('/organisersdashboard/announcements')}
-                                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 rounded-lg transition-all group"
+                                className="w-full flex items-center justify-between p-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-orange-500 text-white p-2 rounded-lg">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                                        </svg>
+                                    <div className="bg-red-600/10 text-red-500 p-2 rounded-lg">
+                                        <Megaphone className="w-5 h-5" />
                                     </div>
-                                    <span className="font-semibold text-gray-900">Send Announcements</span>
+                                    <span className="font-semibold text-white">Send Announcements</span>
                                 </div>
-                                <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
@@ -250,32 +270,37 @@ export default function AdminDashboard() {
             )}
 
             {/* Last Updated */}
-            <div className="text-center text-sm text-gray-500">
-                Last updated: {new Date().toLocaleTimeString()} • Auto-refresh every 30 seconds
+            <div className="text-center">
+                <div className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-full">
+                    <Activity className="w-4 h-4 text-red-500 animate-pulse" />
+                    <span className="text-zinc-400 text-sm">
+                        Last updated: {new Date().toLocaleTimeString()}
+                    </span>
+                    <span className="text-zinc-700">•</span>
+                    <span className="text-zinc-400 text-sm">Auto-refresh every 30s</span>
+                </div>
             </div>
         </div>
     );
 }
 
-function StatCard({ title, value, icon, color, subtitle, trend }: any) {
-    const colors: any = {
-        blue: 'from-blue-500 to-blue-600',
-        green: 'from-green-500 to-green-600',
-        purple: 'from-purple-500 to-purple-600',
-        orange: 'from-orange-500 to-orange-600',
-    };
-
+function StatCard({ title, value, icon: Icon, subtitle, trend }: any) {
     return (
-        <div className={`bg-gradient-to-br ${colors[color]} text-white rounded-lg shadow-lg p-6 transform hover:scale-105 transition-transform`}>
-            <div className="flex items-start justify-between mb-3">
-                <span className="text-4xl">{icon}</span>
-                <span className="text-5xl font-bold">{value}</span>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-red-600/50 transition-all duration-200">
+            <div className="flex items-start justify-between mb-4">
+                <div className="bg-red-600/10 p-3 rounded-lg">
+                    <Icon className="w-6 h-6 text-red-500" />
+                </div>
+                <span className="text-5xl font-bold text-white">{value}</span>
             </div>
             <p className="text-white font-semibold text-lg mb-1">{title}</p>
-            <p className="text-white/70 text-sm">{subtitle}</p>
+            <p className="text-zinc-400 text-sm">{subtitle}</p>
             {trend && (
-                <div className="mt-3 pt-3 border-t border-white/20">
-                    <p className="text-xs text-white/80">{trend}</p>
+                <div className="mt-3 pt-3 border-t border-zinc-800">
+                    <div className="flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3 text-red-500" />
+                        <p className="text-xs text-zinc-500">{trend}</p>
+                    </div>
                 </div>
             )}
         </div>
