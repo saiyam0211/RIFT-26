@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"strings"
+
 
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/database"
@@ -155,13 +157,16 @@ func (r *TeamRepository) GetByDashboardToken(ctx context.Context, token string) 
 
 // GetMembersByTeamID retrieves all members of a team
 func (r *TeamRepository) GetMembersByTeamID(ctx context.Context, teamID uuid.UUID) ([]models.TeamMember, error) {
-	query := `
+	// Use Query instead of QueryContext to avoid prepared statement caching issues
+	query := fmt.Sprintf(`
 		SELECT id, team_id, name, email, phone, role, tshirt_size,
 		       individual_qr_token, created_at, updated_at
-		FROM team_members WHERE team_id = $1
+		FROM team_members 
+		WHERE team_id = '%s'
 		ORDER BY role DESC, name ASC
-	`
-	rows, err := r.db.QueryContext(ctx, query, teamID)
+	`, teamID.String())
+	
+	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get team members: %w", err)
 	}
@@ -179,6 +184,10 @@ func (r *TeamRepository) GetMembersByTeamID(ctx context.Context, teamID uuid.UUI
 			return nil, fmt.Errorf("failed to scan member: %w", err)
 		}
 		members = append(members, member)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating members: %w", err)
 	}
 
 	return members, nil
@@ -435,7 +444,7 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get teams: %w", err)
+		return nil, fmt.Errorf("failed to query teams: %w", err)
 	}
 	defer rows.Close()
 
@@ -449,18 +458,62 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 			&team.DashboardToken, &team.MemberCount, &team.CreatedAt, &team.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan team: %w", err)
+			return nil, fmt.Errorf("failed to scan team row: %w", err)
 		}
 		teams = append(teams, team)
 	}
 
-	// Load members for each team
-	for i := range teams {
-		members, err := r.GetTeamMembers(ctx, teams[i].ID)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating team rows: %w", err)
+	}
+
+	// If no teams, return early
+	if len(teams) == 0 {
+		return teams, nil
+	}
+
+	// Load all members in a single query (fix N+1 problem)
+	teamIDs := make([]string, len(teams))
+	for i, team := range teams {
+		teamIDs[i] = fmt.Sprintf("'%s'", team.ID.String())
+	}
+	
+	membersQuery := fmt.Sprintf(`
+		SELECT id, team_id, name, email, phone, role, tshirt_size,
+		       individual_qr_token, created_at, updated_at
+		FROM team_members 
+		WHERE team_id IN (%s)
+		ORDER BY team_id, role DESC, name ASC
+	`, strings.Join(teamIDs, ","))
+	
+	memberRows, err := r.db.Query(membersQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all team members: %w", err)
+	}
+	defer memberRows.Close()
+
+	// Group members by team_id
+	membersByTeam := make(map[uuid.UUID][]models.TeamMember)
+	for memberRows.Next() {
+		var member models.TeamMember
+		err := memberRows.Scan(
+			&member.ID, &member.TeamID, &member.Name, &member.Email,
+			&member.Phone, &member.Role, &member.TShirtSize,
+			&member.IndividualQRToken, &member.CreatedAt, &member.UpdatedAt,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load members for team %s: %w", teams[i].ID, err)
+			return nil, fmt.Errorf("failed to scan member: %w", err)
 		}
-		teams[i].Members = members
+		membersByTeam[member.TeamID] = append(membersByTeam[member.TeamID], member)
+	}
+
+	// Assign members to their teams
+	for i := range teams {
+		if members, ok := membersByTeam[teams[i].ID]; ok {
+			teams[i].Members = members
+		} else {
+			teams[i].Members = []models.TeamMember{}
+		}
 	}
 
 	return teams, nil
@@ -468,39 +521,8 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 
 // GetTeamMembers retrieves all members for a specific team
 func (r *TeamRepository) GetTeamMembers(ctx context.Context, teamID uuid.UUID) ([]models.TeamMember, error) {
-	query := `
-		SELECT id, team_id, name, email, phone, role, individual_qr_token, 
-		       tshirt_size, created_at, updated_at
-		FROM team_members
-		WHERE team_id = $1
-		ORDER BY role DESC, created_at ASC
-	`
-
-	rows, err := r.db.QueryContext(ctx, query, teamID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query team members: %w", err)
-	}
-	defer rows.Close()
-
-	var members []models.TeamMember
-	for rows.Next() {
-		var member models.TeamMember
-		err := rows.Scan(
-			&member.ID, &member.TeamID, &member.Name, &member.Email,
-			&member.Phone, &member.Role, &member.IndividualQRToken,
-			&member.TShirtSize, &member.CreatedAt, &member.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan team member: %w", err)
-		}
-		members = append(members, member)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating team members: %w", err)
-	}
-
-	return members, nil
+	// Use the same function as GetMembersByTeamID to avoid duplication
+	return r.GetMembersByTeamID(ctx, teamID)
 }
 
 // CreateTeamWithMembers creates a team and its members in a single transaction

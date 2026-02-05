@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -493,7 +494,8 @@ func (h *AdminHandler) GetAllTeams(c *gin.Context) {
 
 	teams, err := h.teamRepo.GetAllWithFilters(c.Request.Context(), status, city)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to fetch teams"})
+		log.Printf("❌ Error fetching teams: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to fetch teams", "details": err.Error()})
 		return
 	}
 
