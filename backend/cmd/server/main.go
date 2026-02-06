@@ -96,8 +96,9 @@ func main() {
 		// Feature flags endpoint
 		v1.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{
-				"otp_enabled":       cfg.EnableEmailOTP,
+				"otp_enabled":         cfg.EnableEmailOTP,
 				"city_change_enabled": cfg.AllowCityChange,
+				"rsvp_open":           cfg.RSVPOpen,
 			})
 		})
 

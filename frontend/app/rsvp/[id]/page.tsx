@@ -37,6 +37,15 @@ export default function RSVPPage() {
             try {
                 const response = await apiClient.get('/config')
                 setCityChangeEnabled(response.data.city_change_enabled || false)
+                
+                // Check if RSVP is open
+                const isRSVPOpen = response.data.rsvp_open || false
+                
+                // If RSVP is closed and team hasn't done RSVP, redirect to home
+                if (!isRSVPOpen && authTeam && !authTeam.rsvp_locked) {
+                    router.push('/')
+                    return
+                }
             } catch (error) {
                 console.error('Failed to fetch config:', error)
                 setCityChangeEnabled(false)

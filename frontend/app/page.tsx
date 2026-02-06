@@ -33,6 +33,8 @@ export default function Home() {
     const [error, setError] = useState('');
     const [isRSVPLocked, setIsRSVPLocked] = useState(false);
     const [otpEnabled, setOtpEnabled] = useState(true); // Track if OTP is enabled on backend
+    const [rsvpOpen, setRsvpOpen] = useState(true); // Track if RSVP window is open
+    const [showRSVPClosedModal, setShowRSVPClosedModal] = useState(false);
 
     // Debounced autocomplete with loading state
     useEffect(() => {
@@ -84,6 +86,38 @@ export default function Home() {
         setError('');
 
         try {
+            // First, check if RSVP is open
+            const configResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
+            const isRSVPOpen = configResponse.data.rsvp_open || false;
+            setRsvpOpen(isRSVPOpen);
+
+            // If RSVP is closed and team hasn't done RSVP yet, show modal
+            if (!isRSVPOpen && !selectedTeam.rsvp_locked) {
+                setLoading(false);
+                setShowRSVPClosedModal(true);
+                return;
+            }
+
+            // If team has already done RSVP, redirect to dashboard
+            if (selectedTeam.rsvp_locked) {
+                // Authenticate first to get dashboard token
+                const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/send-email-otp`, {
+                    team_id: selectedTeam.id,
+                    email: email
+                });
+
+                const requiresOtp = response.data.otp_enabled !== false && response.data.requires_otp !== false;
+                setOtpEnabled(requiresOtp);
+
+                if (!requiresOtp) {
+                    await handleDirectAuth();
+                } else {
+                    setStep('verifying');
+                }
+                return;
+            }
+
+            // Normal flow - RSVP is open and team hasn't done RSVP
             const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/send-email-otp`, {
                 team_id: selectedTeam.id,
                 email: email
@@ -546,6 +580,66 @@ export default function Home() {
                     )}
                 </div>
             </div>
+
+            {/* RSVP Closed Modal */}
+            {showRSVPClosedModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-gradient-to-br from-zinc-900 to-black border-2 border-red-600/50 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl">
+                        <div className="text-center space-y-6">
+                            {/* Icon */}
+                            <div className="flex justify-center">
+                                <div className="bg-red-600/20 p-4 rounded-full">
+                                    <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* Title */}
+                            <div>
+                                <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                                    RSVP Closed
+                                </h2>
+                                <p className="text-red-400 text-lg font-semibold">
+                                    You're Late!
+                                </p>
+                            </div>
+
+                            {/* Message */}
+                            <div className="space-y-2">
+                                <p className="text-gray-300 text-sm md:text-base">
+                                    The RSVP window has been closed. Unfortunately, you cannot complete your RSVP at this time.
+                                </p>
+                                <p className="text-gray-400 text-xs md:text-sm">
+                                    If you believe this is an error, please contact the RIFT team.
+                                </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="space-y-3 pt-4">
+                                <button
+                                    onClick={() => {
+                                        setShowRSVPClosedModal(false);
+                                        setStep('search');
+                                        setSelectedTeam(null);
+                                        setEmail('');
+                                        setSearchQuery('');
+                                    }}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all"
+                                >
+                                    Back to Home
+                                </button>
+                                <button
+                                    onClick={() => window.open('https://www.instagram.com/rift.pwioi', '_blank')}
+                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-6 rounded-lg transition-all border border-white/20"
+                                >
+                                    Contact Us on Instagram
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

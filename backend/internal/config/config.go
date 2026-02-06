@@ -15,6 +15,7 @@ type Config struct {
 	// Feature Flags
 	EnableEmailOTP  bool // Set to false to skip OTP and use email-only auth
 	AllowCityChange bool // Set to false to prevent teams from changing their city during RSVP
+	RSVPOpen        bool // Set to false to close RSVP window
 	// SMTP Email Configuration
 	SMTPHost      string
 	SMTPPort      string
@@ -37,6 +38,7 @@ func Load() (*Config, error) {
 		// Feature Flags
 		EnableEmailOTP:  getEnv("ENABLE_EMAIL_OTP", "false") == "true",
 		AllowCityChange: getEnv("ALLOW_CITY_CHANGE", "false") == "true",
+		RSVPOpen:        getEnv("RSVP_OPEN", "false") == "true",
 		// SMTP Configuration
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),
