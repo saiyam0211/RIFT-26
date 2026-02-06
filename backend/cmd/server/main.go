@@ -55,7 +55,7 @@ func main() {
 	announcementService := services.NewAnnouncementService(db.DB)
 
 	// Initialize handlers
-	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret)
+	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange)
 	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
 	volunteerHandler := handlers.NewVolunteerHandler(checkinService)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
@@ -91,6 +91,14 @@ func main() {
 		// Public routes
 		v1.GET("/ping", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "pong"})
+		})
+
+		// Feature flags endpoint
+		v1.GET("/config", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"otp_enabled":       cfg.EnableEmailOTP,
+				"city_change_enabled": cfg.AllowCityChange,
+			})
 		})
 
 		// Team routes (public search, public dashboard)

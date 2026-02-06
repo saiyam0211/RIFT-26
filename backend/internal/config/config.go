@@ -13,7 +13,8 @@ type Config struct {
 	Environment    string
 	AllowedOrigins string
 	// Feature Flags
-	EnableEmailOTP bool // Set to false to skip OTP and use email-only auth
+	EnableEmailOTP  bool // Set to false to skip OTP and use email-only auth
+	AllowCityChange bool // Set to false to prevent teams from changing their city during RSVP
 	// SMTP Email Configuration
 	SMTPHost      string
 	SMTPPort      string
@@ -34,7 +35,8 @@ func Load() (*Config, error) {
 		Environment:    getEnv("ENVIRONMENT", "development"),
 		AllowedOrigins: getEnv("ALLOWED_ORIGINS", "http://localhost:3000"),
 		// Feature Flags
-		EnableEmailOTP: getEnv("ENABLE_EMAIL_OTP", "false") == "true",
+		EnableEmailOTP:  getEnv("ENABLE_EMAIL_OTP", "false") == "true",
+		AllowCityChange: getEnv("ALLOW_CITY_CHANGE", "false") == "true",
 		// SMTP Configuration
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),

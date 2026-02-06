@@ -30,8 +30,21 @@ export default function RSVPPage() {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
+    const [cityChangeEnabled, setCityChangeEnabled] = useState(false)
 
     useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const response = await apiClient.get('/config')
+                setCityChangeEnabled(response.data.city_change_enabled || false)
+            } catch (error) {
+                console.error('Failed to fetch config:', error)
+                setCityChangeEnabled(false)
+            }
+        }
+
+        fetchConfig()
+
         if (!isAuthenticated) {
             router.push('/')
             return
@@ -475,13 +488,26 @@ export default function RSVPPage() {
                                     Select City Venue
                                 </h2>
 
+                                {!cityChangeEnabled && (
+                                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                        <p className="text-yellow-200 text-sm text-center">
+                                            City selection is locked. Your team will participate in {CITIES.find(c => c.value === city)?.label}.
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4">
                                     {CITIES.map((c) => (
                                         <button
                                             key={c.value}
                                             type="button"
-                                            onClick={() => setCity(c.value)}
-                                            className={`py-4 px-4 rounded-lg font-semibold text-lg transition cursor-pointer ${city === c.value
+                                            onClick={() => cityChangeEnabled && setCity(c.value)}
+                                            disabled={!cityChangeEnabled}
+                                            className={`py-4 px-4 rounded-lg font-semibold text-lg transition ${
+                                                !cityChangeEnabled 
+                                                    ? 'cursor-not-allowed opacity-50' 
+                                                    : 'cursor-pointer'
+                                            } ${city === c.value
                                                 ? 'bg-[#c0211f] text-white'
                                                 : 'bg-white/10 text-gray-300 hover:bg-white/20'
                                                 }`}

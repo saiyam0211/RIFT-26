@@ -9,14 +9,16 @@ import (
 )
 
 type TeamHandler struct {
-	teamService *services.TeamService
-	jwtSecret   string
+	teamService     *services.TeamService
+	jwtSecret       string
+	allowCityChange bool
 }
 
-func NewTeamHandler(teamService *services.TeamService, jwtSecret string) *TeamHandler {
+func NewTeamHandler(teamService *services.TeamService, jwtSecret string, allowCityChange bool) *TeamHandler {
 	return &TeamHandler{
-		teamService: teamService,
-		jwtSecret:   jwtSecret,
+		teamService:     teamService,
+		jwtSecret:       jwtSecret,
+		allowCityChange: allowCityChange,
 	}
 }
 
@@ -83,7 +85,20 @@ func (h *TeamHandler) SubmitRSVP(c *gin.Context) {
 		return
 	}
 
-	err = h.teamService.SubmitRSVP(c.Request.Context(), teamID, req.City, req.Members)
+	// If city change is not allowed, get the existing team city
+	cityToUse := req.City
+	if !h.allowCityChange {
+		team, err := h.teamService.GetTeamByID(c.Request.Context(), teamID)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Failed to fetch team"})
+			return
+		}
+		if team.City != nil {
+			cityToUse = *team.City
+		}
+	}
+
+	err = h.teamService.SubmitRSVP(c.Request.Context(), teamID, cityToUse, req.Members)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
