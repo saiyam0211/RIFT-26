@@ -38,11 +38,11 @@ export default function RSVPPage() {
                 const response = await apiClient.get('/config')
                 setCityChangeEnabled(response.data.city_change_enabled || false)
                 
-                // Check if RSVP is open
-                const isRSVPOpen = response.data.rsvp_open || false
+                // Check RSVP mode: only redirect when fully closed ("false"), not when "pin"
+                const rsvpMode = response.data.rsvp_open
+                const isClosed = rsvpMode === false || rsvpMode === 'false'
                 
-                // If RSVP is closed and team hasn't done RSVP, redirect to home
-                if (!isRSVPOpen && authTeam && !authTeam.rsvp_locked) {
+                if (isClosed && authTeam && !authTeam.rsvp_locked) {
                     router.push('/')
                     return
                 }

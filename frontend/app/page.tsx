@@ -33,8 +33,12 @@ export default function Home() {
     const [error, setError] = useState('');
     const [isRSVPLocked, setIsRSVPLocked] = useState(false);
     const [otpEnabled, setOtpEnabled] = useState(true); // Track if OTP is enabled on backend
-    const [rsvpOpen, setRsvpOpen] = useState(true); // Track if RSVP window is open
+    const [rsvpOpenMode, setRsvpOpenMode] = useState<string>('false'); // from backend config only: 'true' | 'false' | 'pin'
     const [showRSVPClosedModal, setShowRSVPClosedModal] = useState(false);
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [pinValue, setPinValue] = useState('');
+    const [pinError, setPinError] = useState('');
+    const [pinLoading, setPinLoading] = useState(false);
 
     // Debounced autocomplete with loading state
     useEffect(() => {
@@ -86,13 +90,13 @@ export default function Home() {
         setError('');
 
         try {
-            // First, check if RSVP is open
+            // First, check RSVP mode: "true" | "false" | "pin"
             const configResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
-            const isRSVPOpen = configResponse.data.rsvp_open || false;
-            setRsvpOpen(isRSVPOpen);
+            const mode = configResponse.data.rsvp_open === 'pin' ? 'pin' : configResponse.data.rsvp_open === true || configResponse.data.rsvp_open === 'true' ? 'true' : 'false';
+            setRsvpOpenMode(mode);
 
-            // If RSVP is closed and team hasn't done RSVP yet, show modal
-            if (!isRSVPOpen && !selectedTeam.rsvp_locked) {
+            // If RSVP is fully closed (not pin) and team hasn't done RSVP yet, show closed modal
+            if (mode === 'false' && !selectedTeam.rsvp_locked) {
                 setLoading(false);
                 setShowRSVPClosedModal(true);
                 return;
@@ -169,7 +173,13 @@ export default function Home() {
             if (team.rsvp_locked && team.dashboard_token) {
                 router.push(`/dashboard/${team.dashboard_token}`);
             } else {
-                router.push(`/rsvp/${team.id}`);
+                const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
+                const m = configRes.data.rsvp_open === 'pin' ? 'pin' : configRes.data.rsvp_open === true || configRes.data.rsvp_open === 'true' ? 'true' : 'false';
+                if (m === 'pin') {
+                    setShowPinModal(true);
+                } else {
+                    router.push(`/rsvp/${team.id}`);
+                }
             }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to authenticate');
@@ -201,13 +211,43 @@ export default function Home() {
             if (team.rsvp_locked && team.dashboard_token) {
                 router.push(`/dashboard/${team.dashboard_token}`);
             } else {
-                router.push(`/rsvp/${team.id}`);
+                const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
+                const m = configRes.data.rsvp_open === 'pin' ? 'pin' : configRes.data.rsvp_open === true || configRes.data.rsvp_open === 'true' ? 'true' : 'false';
+                if (m === 'pin') {
+                    setShowPinModal(true);
+                } else {
+                    router.push(`/rsvp/${team.id}`);
+                }
             }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to verify OTP');
             console.error('OTP Verification Error:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePinSubmit = async () => {
+        const trimmed = pinValue.replace(/\D/g, '').slice(0, 6);
+        if (trimmed.length !== 6) {
+            setPinError('Please enter a 6-digit PIN');
+            return;
+        }
+        setPinError('');
+        setPinLoading(true);
+        try {
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/validate-rsvp-pin`, { pin: trimmed });
+            if (res.data.valid && selectedTeam) {
+                setShowPinModal(false);
+                setPinValue('');
+                router.push(`/rsvp/${selectedTeam.id}`);
+            } else {
+                setPinError('Invalid PIN');
+            }
+        } catch (err: any) {
+            setPinError(err.response?.data?.error || 'Invalid PIN');
+        } finally {
+            setPinLoading(false);
         }
     };
 
@@ -634,6 +674,66 @@ export default function Home() {
                                     className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-6 rounded-lg transition-all border border-white/20"
                                 >
                                     Contact Us on Instagram
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RSVP PIN Modal (when RSVP_OPEN=pin and team hasn't done RSVP) */}
+            {showPinModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-900 border-2 border-red-600/50 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl">
+                        <div className="text-center space-y-6">
+                            <div className="flex justify-center">
+                                <div className="bg-red-600/20 p-4 rounded-full">
+                                    <svg className="w-12 h-12 md:w-14 md:h-14 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <h2 className="text-xl md:text-2xl font-bold text-white mb-1">Enter Secret PIN</h2>
+                                <p className="text-gray-400 text-sm md:text-base">Ask your organizer for the 6-digit PIN to continue RSVP</p>
+                            </div>
+                            <div>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={6}
+                                    placeholder="000000"
+                                    value={pinValue}
+                                    onChange={(e) => {
+                                        const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                        setPinValue(v);
+                                        setPinError('');
+                                    }}
+                                    className="w-full text-center text-2xl md:text-3xl tracking-[0.5em] font-mono bg-zinc-950 border-2 border-zinc-700 rounded-lg py-3 px-4 text-white placeholder-zinc-500 focus:border-red-600 focus:ring-2 focus:ring-red-600/30 focus:outline-none"
+                                />
+                                {pinError && <p className="text-red-400 text-sm mt-2">{pinError}</p>}
+                            </div>
+                            <div className="space-y-3 pt-2">
+                                <button
+                                    onClick={handlePinSubmit}
+                                    disabled={pinLoading || pinValue.replace(/\D/g, '').length !== 6}
+                                    className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all"
+                                >
+                                    {pinLoading ? 'Verifying...' : 'Continue to RSVP'}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowPinModal(false);
+                                        setPinValue('');
+                                        setPinError('');
+                                        setStep('search');
+                                        setSelectedTeam(null);
+                                        setEmail('');
+                                        setSearchQuery('');
+                                    }}
+                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-6 rounded-lg transition-all border border-white/20"
+                                >
+                                    Cancel
                                 </button>
                             </div>
                         </div>

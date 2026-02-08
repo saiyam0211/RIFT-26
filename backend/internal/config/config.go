@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -13,9 +14,10 @@ type Config struct {
 	Environment    string
 	AllowedOrigins string
 	// Feature Flags
-	EnableEmailOTP  bool // Set to false to skip OTP and use email-only auth
-	AllowCityChange bool // Set to false to prevent teams from changing their city during RSVP
-	RSVPOpen        bool // Set to false to close RSVP window
+	EnableEmailOTP  bool   // Set to false to skip OTP and use email-only auth
+	AllowCityChange bool   // Set to false to prevent teams from changing their city during RSVP
+	RSVPOpen        string // "true" = open, "false" = closed, "pin" = PIN-protected
+	RSVPPinSecret   string // Secret for generating 6-digit PIN (rotates every 3 hours)
 	// SMTP Email Configuration
 	SMTPHost      string
 	SMTPPort      string
@@ -35,10 +37,11 @@ func Load() (*Config, error) {
 		Port:           getEnv("PORT", "8080"),
 		Environment:    getEnv("ENVIRONMENT", "development"),
 		AllowedOrigins: getEnv("ALLOWED_ORIGINS", "http://localhost:3000"),
-		// Feature Flags
+		// Feature Flags (RSVP_OPEN from env only: "true" | "false" | "pin")
 		EnableEmailOTP:  getEnv("ENABLE_EMAIL_OTP", "false") == "true",
 		AllowCityChange: getEnv("ALLOW_CITY_CHANGE", "false") == "true",
-		RSVPOpen:        getEnv("RSVP_OPEN", "false") == "true",
+		RSVPOpen:        normalizeRSVPOpen(getEnv("RSVP_OPEN", "false")),
+		RSVPPinSecret:   getEnv("RSVP_PIN_SECRET", ""),
 		// SMTP Configuration
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),
@@ -51,7 +54,16 @@ func Load() (*Config, error) {
 
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
-		return value
+		return strings.TrimSpace(value)
 	}
 	return defaultValue
+}
+
+// normalizeRSVPOpen returns "true", "pin", or "false" from env value. No hardcoding.
+func normalizeRSVPOpen(v string) string {
+	v = strings.TrimSpace(strings.ToLower(v))
+	if v == "true" || v == "pin" {
+		return v
+	}
+	return "false"
 }

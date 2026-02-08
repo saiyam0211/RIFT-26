@@ -59,6 +59,7 @@ func main() {
 	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
 	volunteerHandler := handlers.NewVolunteerHandler(checkinService)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
+	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
 	ticketHandler := handlers.NewTicketHandler(ticketService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementService)
 	bulkEmailHandler := handlers.NewBulkEmailHandler(db.DB, emailService, announcementService)
@@ -95,10 +96,14 @@ func main() {
 
 		// Feature flags endpoint
 		v1.GET("/config", func(c *gin.Context) {
+			rsvpOpen := cfg.RSVPOpen
+			if rsvpOpen != "true" && rsvpOpen != "pin" {
+				rsvpOpen = "false"
+			}
 			c.JSON(200, gin.H{
 				"otp_enabled":         cfg.EnableEmailOTP,
 				"city_change_enabled": cfg.AllowCityChange,
-				"rsvp_open":           cfg.RSVPOpen,
+				"rsvp_open":           rsvpOpen,
 			})
 		})
 
@@ -118,11 +123,12 @@ func main() {
 		// Ticket creation (public, but requires team info)
 		v1.POST("/tickets", ticketHandler.CreateTicket)
 
-		// Auth routes (email OTP)
+		// Auth routes (email OTP + RSVP PIN)
 		authRoutes := v1.Group("/auth")
 		{
 			authRoutes.POST("/send-email-otp", middleware.RateLimitMiddleware(5, 1*time.Minute), emailOTPHandler.SendEmailOTP)
 			authRoutes.POST("/verify-email-otp", middleware.RateLimitMiddleware(5, 1*time.Minute), emailOTPHandler.VerifyEmailOTP)
+			authRoutes.POST("/validate-rsvp-pin", middleware.RateLimitMiddleware(10, 1*time.Minute), rsvpPinHandler.ValidatePIN)
 		}
 
 		// Volunteer routes (protected)
@@ -165,6 +171,9 @@ func main() {
 
 			// Stats
 			adminRoutes.GET("/stats/checkin", adminHandler.GetCheckInStats)
+
+			// RSVP PIN (when RSVP_OPEN=pin)
+			adminRoutes.GET("/rsvp-pin", rsvpPinHandler.GetRSVPPin)
 		}
 	}
 

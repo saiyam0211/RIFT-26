@@ -13,22 +13,65 @@ import {
     BarChart3,
     Upload,
     UserPlus,
-    Megaphone
+    Megaphone,
+    KeyRound
 } from 'lucide-react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
 import { TeamStats } from '../../../src/types/admin';
+
+interface RSVPPinData {
+    enabled: boolean;
+    pin: string;
+    next_rotation_at: string | null;
+    seconds_until_rotation: number;
+}
 
 export default function AdminDashboard() {
     const router = useRouter();
     const [stats, setStats] = useState<TeamStats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [rsvpOpenMode, setRsvpOpenMode] = useState<string>('false'); // from backend: "true" | "false" | "pin"
+    const [rsvpPin, setRsvpPin] = useState<RSVPPinData | null>(null);
+    const [pinSecondsLeft, setPinSecondsLeft] = useState<number>(0);
 
     useEffect(() => {
         fetchStats();
-        // Refresh every 30 seconds
+        fetchConfig();
         const interval = setInterval(fetchStats, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    const fetchConfig = async () => {
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/config`);
+            const data = await response.json();
+            const mode = data.rsvp_open === 'pin' ? 'pin' : data.rsvp_open === true || data.rsvp_open === 'true' ? 'true' : 'false';
+            setRsvpOpenMode(mode);
+            if (mode === 'pin') {
+                fetchRsvpPin();
+            } else {
+                setRsvpPin(null);
+            }
+        } catch (error) {
+            console.error('Failed to fetch config:', error);
+            setRsvpOpenMode('false');
+        }
+    };
+
+    useEffect(() => {
+        if (rsvpOpenMode !== 'pin' || !rsvpPin?.enabled || rsvpPin.seconds_until_rotation <= 0) return;
+        setPinSecondsLeft(rsvpPin.seconds_until_rotation);
+        const t = setInterval(() => {
+            setPinSecondsLeft((prev) => {
+                if (prev <= 1) {
+                    fetchRsvpPin();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(t);
+    }, [rsvpOpenMode, rsvpPin?.enabled, rsvpPin?.seconds_until_rotation]);
 
     const fetchStats = async () => {
         try {
@@ -43,6 +86,32 @@ export default function AdminDashboard() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchRsvpPin = async () => {
+        try {
+            const token = getAdminToken();
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/rsvp-pin`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await response.json();
+            setRsvpPin({
+                enabled: data.enabled || false,
+                pin: data.pin || '',
+                next_rotation_at: data.next_rotation_at || null,
+                seconds_until_rotation: data.seconds_until_rotation ?? 0,
+            });
+        } catch (error) {
+            console.error('Failed to fetch RSVP PIN:', error);
+            setRsvpPin(null);
+        }
+    };
+
+    const formatCountdown = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     if (loading) {
@@ -107,6 +176,39 @@ export default function AdminDashboard() {
                     trend="Across India"
                 />
             </div>
+
+            {/* RSVP Secret PIN Card - only when backend config RSVP_OPEN=pin (no /admin/rsvp-pin call otherwise) */}
+            {rsvpOpenMode === 'pin' && (
+                <div className="bg-zinc-900 border-2 border-red-600/40 rounded-xl p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-red-600/20 rounded-xl">
+                                <KeyRound className="w-8 h-8 text-red-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-white">RSVP Secret PIN</h3>
+                                <p className="text-zinc-400 text-sm">Share this PIN with team leaders to allow RSVP. Rotates every 3 hours.</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:items-end gap-2">
+                            {rsvpPin ? (
+                                <>
+                                    <div className="bg-zinc-950 border border-zinc-700 rounded-lg px-6 py-4">
+                                        <p className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Current PIN</p>
+                                        <p className="text-3xl md:text-4xl font-mono font-bold text-white tracking-[0.3em]">{rsvpPin.pin}</p>
+                                    </div>
+                                    <div className="text-sm text-zinc-400">
+                                        <span className="text-zinc-500">Next rotation in </span>
+                                        <span className="font-mono font-semibold text-red-400">{formatCountdown(pinSecondsLeft > 0 ? pinSecondsLeft : rsvpPin.seconds_until_rotation)}</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-zinc-500">Loading PIN…</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Progress Bars */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
