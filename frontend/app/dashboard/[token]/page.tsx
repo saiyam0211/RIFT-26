@@ -231,8 +231,9 @@ export default function DashboardPage() {
                     className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
                     onClick={(e) => e.target === e.currentTarget && setShowAnnouncementsModal(false)}
                 >
-                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                        {/* Fixed Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
                             <h3 className="text-white text-xl font-semibold flex items-center gap-2">
                                 <Bell className="text-[#c0211f]" size={24} />
                                 Announcements
@@ -244,36 +245,40 @@ export default function DashboardPage() {
                                 <X size={24} />
                             </button>
                         </div>
-                        {announcements.length > 0 ? (
-                            <div className="space-y-4">
-                                {announcements.map((announcement) => (
-                                    <div
-                                        key={announcement.id}
-                                        className="bg-white/5 border border-white/10 p-4 rounded-lg"
-                                    >
-                                        <h4 className="text-white font-semibold mb-2">{announcement.title}</h4>
-                                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{announcement.content}</p>
-                                        {announcement.button_text && announcement.button_url && (
-                                            <div className="mt-4">
-                                                <a
-                                                    href={announcement.button_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#c0211f] hover:bg-[#a01b1a] text-white text-sm font-medium transition-colors"
-                                                >
-                                                    {announcement.button_text}
-                                                </a>
-                                            </div>
-                                        )}
-                                        <p className="text-gray-500 text-xs mt-3">
-                                            {new Date(announcement.created_at).toLocaleString()}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-gray-400 text-center py-8">No announcements yet</p>
-                        )}
+                        
+                        {/* Scrollable Content */}
+                        <div className="flex-1 overflow-y-auto no-scrollbar p-6">
+                            {announcements.length > 0 ? (
+                                <div className="space-y-4">
+                                    {announcements.map((announcement) => (
+                                        <div
+                                            key={announcement.id}
+                                            className="bg-white/5 border border-white/10 p-4 rounded-lg"
+                                        >
+                                            <h4 className="text-white font-semibold mb-2">{announcement.title}</h4>
+                                            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{announcement.content}</p>
+                                            {announcement.button_text && announcement.button_url && (
+                                                <div className="mt-4">
+                                                    <a
+                                                        href={announcement.button_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#c0211f] hover:bg-[#a01b1a] text-white text-sm font-medium transition-colors"
+                                                    >
+                                                        {announcement.button_text}
+                                                    </a>
+                                                </div>
+                                            )}
+                                            <p className="text-gray-500 text-xs mt-3">
+                                                {new Date(announcement.created_at).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-400 text-center py-8">No announcements yet</p>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
