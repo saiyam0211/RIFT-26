@@ -115,7 +115,7 @@ export default function VolunteerScannerPage() {
 
             // If already checked in, show who was checked in
             if (response.data.already_checked_in) {
-                const checkedInIds = new Set(
+                const checkedInIds = new Set<string>(
                     response.data.participants_checked_in.map((p: ParticipantCheckIn) =>
                         p.participant_role === 'leader' ? 'leader' : p.id
                     )
@@ -254,7 +254,7 @@ export default function VolunteerScannerPage() {
 
     const resetScanner = () => {
         setScannedTeam(null)
-        setSelectedParticipants(new Set())
+        setSelectedParticipants(new Set<string>())
         setAlreadyCheckedIn(false)
         setParticipantsCheckedIn([])
         setError('')
