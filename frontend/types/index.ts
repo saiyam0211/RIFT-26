@@ -42,6 +42,8 @@ export interface Announcement {
   content: string
   priority: number
   is_active: boolean
+  button_text?: string | null
+  button_url?: string | null
   created_at: string
 }
 

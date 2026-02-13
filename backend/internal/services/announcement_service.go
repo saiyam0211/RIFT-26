@@ -47,23 +47,25 @@ func (s *AnnouncementService) CreateAnnouncement(req models.CreateAnnouncementRe
 	}
 
 	_, err = s.db.Exec(`
-		INSERT INTO announcements (id, title, content, priority, filters, is_active, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, true, $6, $7, $7)
-	`, announcementID, req.Title, req.Content, priority, filtersJSON, createdByPtr, now)
+		INSERT INTO announcements (id, title, content, priority, filters, is_active, created_by, created_at, updated_at, button_text, button_url)
+		VALUES ($1, $2, $3, $4, $5, true, $6, $7, $7, $8, $9)
+	`, announcementID, req.Title, req.Content, priority, filtersJSON, createdByPtr, now, req.ButtonText, req.ButtonURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create announcement: %w", err)
 	}
 
 	announcement := &models.Announcement{
-		ID:        announcementID,
-		Title:     req.Title,
-		Content:   req.Content,
-		Priority:  priority,
-		IsActive:  true,
-		Filters:   filtersJSON,
-		CreatedBy: createdByPtr,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         announcementID,
+		Title:      req.Title,
+		Content:    req.Content,
+		Priority:   priority,
+		IsActive:   true,
+		ButtonText: req.ButtonText,
+		ButtonURL:  req.ButtonURL,
+		Filters:    filtersJSON,
+		CreatedBy:  createdByPtr,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	return announcement, nil
@@ -94,7 +96,7 @@ func (s *AnnouncementService) GetAnnouncementsForTeam(teamID string) ([]models.A
 
 	// Get all active announcements
 	rows, err := s.db.Query(`
-		SELECT id, title, content, priority, COALESCE(filters, '{}'), created_at
+		SELECT id, title, content, priority, COALESCE(filters, '{}'), created_at, button_text, button_url
 		FROM announcements
 		WHERE is_active = true
 		ORDER BY priority DESC, created_at DESC
@@ -108,10 +110,18 @@ func (s *AnnouncementService) GetAnnouncementsForTeam(teamID string) ([]models.A
 	for rows.Next() {
 		var ann models.Announcement
 		var filtersJSON []byte
+		var buttonText, buttonURL sql.NullString
 
-		err := rows.Scan(&ann.ID, &ann.Title, &ann.Content, &ann.Priority, &filtersJSON, &ann.CreatedAt)
+		err := rows.Scan(&ann.ID, &ann.Title, &ann.Content, &ann.Priority, &filtersJSON, &ann.CreatedAt, &buttonText, &buttonURL)
 		if err != nil {
 			continue
+		}
+
+		if buttonText.Valid {
+			ann.ButtonText = &buttonText.String
+		}
+		if buttonURL.Valid {
+			ann.ButtonURL = &buttonURL.String
 		}
 
 		// Parse filters
@@ -187,7 +197,7 @@ func (s *AnnouncementService) matchesFilters(filters models.AnnouncementFilters,
 
 func (s *AnnouncementService) GetAllAnnouncements() ([]models.Announcement, error) {
 	rows, err := s.db.Query(`
-		SELECT id, title, content, priority, is_active, COALESCE(filters, '{}'), created_by, created_at, updated_at
+		SELECT id, title, content, priority, is_active, COALESCE(filters, '{}'), created_by, created_at, updated_at, button_text, button_url
 		FROM announcements
 		ORDER BY created_at DESC
 	`)
@@ -201,10 +211,11 @@ func (s *AnnouncementService) GetAllAnnouncements() ([]models.Announcement, erro
 		var ann models.Announcement
 		var filtersJSON []byte
 		var createdBy sql.NullString
+		var buttonText, buttonURL sql.NullString
 
 		err := rows.Scan(
 			&ann.ID, &ann.Title, &ann.Content, &ann.Priority, &ann.IsActive,
-			&filtersJSON, &createdBy, &ann.CreatedAt, &ann.UpdatedAt,
+			&filtersJSON, &createdBy, &ann.CreatedAt, &ann.UpdatedAt, &buttonText, &buttonURL,
 		)
 		if err != nil {
 			continue
@@ -213,6 +224,13 @@ func (s *AnnouncementService) GetAllAnnouncements() ([]models.Announcement, erro
 		if createdBy.Valid {
 			uid, _ := uuid.Parse(createdBy.String)
 			ann.CreatedBy = &uid
+		}
+
+		if buttonText.Valid {
+			ann.ButtonText = &buttonText.String
+		}
+		if buttonURL.Valid {
+			ann.ButtonURL = &buttonURL.String
 		}
 
 		ann.Filters = filtersJSON

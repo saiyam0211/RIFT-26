@@ -252,7 +252,19 @@ export default function DashboardPage() {
                                         className="bg-white/5 border border-white/10 p-4 rounded-lg"
                                     >
                                         <h4 className="text-white font-semibold mb-2">{announcement.title}</h4>
-                                        <p className="text-gray-300 text-sm leading-relaxed">{announcement.content}</p>
+                                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{announcement.content}</p>
+                                        {announcement.button_text && announcement.button_url && (
+                                            <div className="mt-4">
+                                                <a
+                                                    href={announcement.button_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#c0211f] hover:bg-[#a01b1a] text-white text-sm font-medium transition-colors"
+                                                >
+                                                    {announcement.button_text}
+                                                </a>
+                                            </div>
+                                        )}
                                         <p className="text-gray-500 text-xs mt-3">
                                             {new Date(announcement.created_at).toLocaleString()}
                                         </p>

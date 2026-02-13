@@ -12,6 +12,8 @@ type Announcement struct {
 	Content   string     `json:"content" db:"content"`
 	Priority  int        `json:"priority" db:"priority"`
 	IsActive  bool       `json:"is_active" db:"is_active"`
+	ButtonText *string   `json:"button_text,omitempty" db:"button_text"`
+	ButtonURL  *string   `json:"button_url,omitempty" db:"button_url"`
 	Filters   []byte     `json:"filters,omitempty" db:"filters"` // JSONB
 	CreatedBy *uuid.UUID `json:"created_by" db:"created_by"`
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
@@ -65,6 +67,8 @@ type CreateAnnouncementRequest struct {
 	Title    string              `json:"title" binding:"required"`
 	Content  string              `json:"content" binding:"required"`
 	Priority int                 `json:"priority" binding:"min=0,max=10"`
+	ButtonText *string           `json:"button_text" binding:"omitempty"`
+	ButtonURL  *string           `json:"button_url" binding:"omitempty,url"`
 	Filters  AnnouncementFilters `json:"filters"`
 }
 

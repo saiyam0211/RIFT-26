@@ -7,7 +7,13 @@ import { Announcement } from '../../../src/types/admin';
 export default function AnnouncementsPage() {
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ title: '', content: '', priority: 3 });
+    const [formData, setFormData] = useState({
+        title: '',
+        content: '',
+        priority: 3,
+        button_text: '',
+        button_url: '',
+    });
 
     useEffect(() => {
         fetchAnnouncements();
@@ -38,7 +44,7 @@ export default function AnnouncementsPage() {
                 },
                 body: JSON.stringify(formData),
             });
-            setFormData({ title: '', content: '', priority: 3 });
+            setFormData({ title: '', content: '', priority: 3, button_text: '', button_url: '' });
             setShowForm(false);
             fetchAnnouncements();
         } catch (error) {
@@ -86,6 +92,32 @@ export default function AnnouncementsPage() {
                                 className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                             />
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                                    Button Text (optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.button_text}
+                                    onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
+                                    placeholder="e.g. Watch Reel"
+                                    className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                                    Button Link (optional)
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.button_url}
+                                    onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
+                                    placeholder="https://instagram.com/reel/..."
+                                    className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                                />
+                            </div>
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-zinc-300 mb-2">
                                 Priority (1-5)
@@ -124,7 +156,7 @@ export default function AnnouncementsPage() {
                                 </span>
                             </div>
                         </div>
-                        <p className="text-zinc-300 whitespace-pre-wrap">{announcement.content}</p>
+                        <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{announcement.content}</p>
                         <div className="mt-4 text-xs text-zinc-500">
                             Created: {new Date(announcement.created_at).toLocaleString()}
                         </div>

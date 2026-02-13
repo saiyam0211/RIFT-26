@@ -20,7 +20,7 @@ func NewAnnouncementRepository(db *database.DB) *AnnouncementRepository {
 // GetActiveAnnouncements retrieves all active announcements ordered by priority
 func (r *AnnouncementRepository) GetActiveAnnouncements(ctx context.Context) ([]models.Announcement, error) {
 	query := `
-		SELECT id, title, content, priority, is_active, created_by, created_at, updated_at
+		SELECT id, title, content, priority, is_active, created_by, created_at, updated_at, button_text, button_url
 		FROM announcements
 		WHERE is_active = true
 		ORDER BY priority DESC, created_at DESC
@@ -38,7 +38,7 @@ func (r *AnnouncementRepository) GetActiveAnnouncements(ctx context.Context) ([]
 		err := rows.Scan(
 			&announcement.ID, &announcement.Title, &announcement.Content,
 			&announcement.Priority, &announcement.IsActive, &announcement.CreatedBy,
-			&announcement.CreatedAt, &announcement.UpdatedAt,
+			&announcement.CreatedAt, &announcement.UpdatedAt, &announcement.ButtonText, &announcement.ButtonURL,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan announcement: %w", err)
@@ -65,7 +65,7 @@ func (r *AnnouncementRepository) Create(ctx context.Context, announcement models
 // GetAll retrieves all announcements (active and inactive)
 func (r *AnnouncementRepository) GetAll(ctx context.Context) ([]models.Announcement, error) {
 	query := `
-		SELECT id, title, content, priority, is_active, created_by, created_at, updated_at
+		SELECT id, title, content, priority, is_active, created_by, created_at, updated_at, button_text, button_url
 		FROM announcements
 		ORDER BY priority DESC, created_at DESC
 	`
@@ -82,7 +82,7 @@ func (r *AnnouncementRepository) GetAll(ctx context.Context) ([]models.Announcem
 		err := rows.Scan(
 			&announcement.ID, &announcement.Title, &announcement.Content,
 			&announcement.Priority, &announcement.IsActive, &announcement.CreatedBy,
-			&announcement.CreatedAt, &announcement.UpdatedAt,
+			&announcement.CreatedAt, &announcement.UpdatedAt, &announcement.ButtonText, &announcement.ButtonURL,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan announcement: %w", err)
