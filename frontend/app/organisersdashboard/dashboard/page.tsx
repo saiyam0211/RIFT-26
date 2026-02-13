@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-    Users, 
-    CheckCircle, 
-    Ticket, 
-    MapPin, 
+import {
+    Users,
+    CheckCircle,
+    Ticket,
+    MapPin,
     RefreshCw,
     TrendingUp,
     Activity,
@@ -146,34 +146,27 @@ export default function AdminDashboard() {
             </div>
 
             {/* Main Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard 
-                    title="Total Teams" 
-                    value={stats?.total_teams || 0} 
-                    icon={Users} 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <StatCard
+                    title="Total Teams"
+                    value={stats?.total_teams || 0}
+                    icon={Users}
                     subtitle="Registered teams"
                     trend="+12% this week"
                 />
-                <StatCard 
-                    title="RSVP Confirmed" 
-                    value={stats?.rsvp_confirmed || 0} 
-                    icon={CheckCircle} 
+                <StatCard
+                    title="RSVP Confirmed"
+                    value={stats?.rsvp_confirmed || 0}
+                    icon={CheckCircle}
                     subtitle={`${rsvpPercentage}% completion`}
                     trend={`${stats?.total_teams ? stats.total_teams - stats.rsvp_confirmed : 0} pending`}
                 />
-                <StatCard 
-                    title="Checked In" 
-                    value={stats?.checked_in || 0} 
-                    icon={Ticket} 
+                <StatCard
+                    title="Checked In"
+                    value={stats?.checked_in || 0}
+                    icon={Ticket}
                     subtitle={`${checkinPercentage}% of RSVP`}
                     trend="Live updates"
-                />
-                <StatCard
-                    title="Cities"
-                    value={Object.keys(stats?.city_distribution || {}).length}
-                    icon={MapPin}
-                    subtitle="Participating cities"
-                    trend="Across India"
                 />
             </div>
 
@@ -225,7 +218,7 @@ export default function AdminDashboard() {
                             <span className="font-semibold text-white">{rsvpPercentage}%</span>
                         </div>
                         <div className="w-full bg-zinc-800 rounded-full h-3">
-                            <div 
+                            <div
                                 className="bg-red-600 h-3 rounded-full transition-all duration-500"
                                 style={{ width: `${rsvpPercentage}%` }}
                             ></div>
@@ -250,7 +243,7 @@ export default function AdminDashboard() {
                             <span className="font-semibold text-white">{checkinPercentage}%</span>
                         </div>
                         <div className="w-full bg-zinc-800 rounded-full h-3">
-                            <div 
+                            <div
                                 className="bg-red-600 h-3 rounded-full transition-all duration-500"
                                 style={{ width: `${checkinPercentage}%` }}
                             ></div>
@@ -280,7 +273,7 @@ export default function AdminDashboard() {
                                 .map(([city, count]) => {
                                     const maxCount = Math.max(...Object.values(stats.city_distribution || {}) as number[]);
                                     const percentage = ((count as number) / maxCount) * 100;
-                                    
+
                                     return (
                                         <div key={city}>
                                             <div className="flex items-center justify-between mb-2">
@@ -293,7 +286,7 @@ export default function AdminDashboard() {
                                                 </span>
                                             </div>
                                             <div className="w-full bg-zinc-800 rounded-full h-2">
-                                                <div 
+                                                <div
                                                     className="bg-red-600 h-2 rounded-full transition-all duration-500"
                                                     style={{ width: `${percentage}%` }}
                                                 ></div>

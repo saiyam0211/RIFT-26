@@ -230,21 +230,21 @@ export default function BulkUpload() {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-8">Bulk Team Upload</h1>
+            <h1 className="text-3xl font-bold text-white mb-8">Bulk Team Upload</h1>
 
             {/* Step 1: File Selection */}
             {step === 'select' && (
-                <div className="bg-white rounded-lg shadow p-6 max-w-2xl">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow p-6 w-full">
                     <div className="mb-6">
-                        <h2 className="text-lg font-semibold mb-2">Upload CSV File</h2>
-                        <p className="text-gray-600 text-sm mb-4">
+                        <h2 className="text-lg font-semibold mb-2 text-white">Upload CSV File</h2>
+                        <p className="text-zinc-400 text-sm mb-4">
                             Upload a CSV file with team and member information.
-                            <a href="/SAMPLE_TEAMS_CSV.md" className="text-purple-600 hover:underline ml-1">
+                            <a href="/SAMPLE_TEAMS_CSV.md" className="text-red-500 hover:underline ml-1">
                                 View sample format
                             </a>
                         </p>
 
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
+                        <div className="border-2 border-dashed border-zinc-700 rounded-lg p-8 text-center hover:border-red-600 transition-colors bg-zinc-950">
                             <input
                                 type="file"
                                 accept=".csv"
@@ -257,10 +257,10 @@ export default function BulkUpload() {
                                 htmlFor="csv-upload"
                                 className="cursor-pointer flex flex-col items-center"
                             >
-                                <svg className="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-12 h-12 text-zinc-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                <span className="text-sm text-gray-600">
+                                <span className="text-sm text-zinc-400">
                                     {parsing ? 'Parsing CSV...' : 'Click to select CSV file'}
                                 </span>
                             </label>
@@ -271,33 +271,33 @@ export default function BulkUpload() {
 
             {/* Step 2: Preview */}
             {step === 'preview' && parsedData && (
-                <div className="space-y-6 max-w-2xl">
-                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow-lg p-6 border border-indigo-200">
-                        <h2 className="text-xl font-bold text-indigo-900 mb-4">📊 Upload Preview</h2>
+                <div className="space-y-6 w-full">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg p-6">
+                        <h2 className="text-xl font-bold text-white mb-4">📊 Upload Preview</h2>
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
-                                <p className="text-3xl font-bold text-indigo-600">{parsedData.totalTeams}</p>
-                                <p className="text-sm text-gray-600">Teams</p>
+                            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                                <p className="text-3xl font-bold text-red-500">{parsedData.totalTeams}</p>
+                                <p className="text-sm text-zinc-400">Teams</p>
                             </div>
-                            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
-                                <p className="text-3xl font-bold text-purple-600">{parsedData.totalMembers}</p>
-                                <p className="text-sm text-gray-600">Members</p>
+                            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                                <p className="text-3xl font-bold text-red-500">{parsedData.totalMembers}</p>
+                                <p className="text-sm text-zinc-400">Members</p>
                             </div>
                         </div>
 
                         {/* City Breakdown */}
                         {Object.keys(parsedData.cityBreakdown).length > 0 && (
-                            <div className="bg-white rounded-lg p-4 shadow-sm">
-                                <h3 className="font-semibold text-gray-900 mb-3">📍 City Breakdown</h3>
+                            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                                <h3 className="font-semibold text-white mb-3">📍 City Breakdown</h3>
                                 <div className="grid grid-cols-2 gap-2">
                                     {Object.entries(parsedData.cityBreakdown)
                                         .sort((a, b) => b[1] - a[1])
                                         .map(([city, count]) => (
                                             <div key={city} className="flex justify-between text-sm">
-                                                <span className="text-gray-700">{city}:</span>
-                                                <span className="font-semibold text-indigo-600">{count} teams</span>
+                                                <span className="text-zinc-300">{city}:</span>
+                                                <span className="font-semibold text-red-500">{count} teams</span>
                                             </div>
                                         ))}
                                 </div>
@@ -305,17 +305,17 @@ export default function BulkUpload() {
                         )}
 
                         {/* Sample Teams */}
-                        <div className="bg-white rounded-lg p-4 shadow-sm mt-4">
-                            <h3 className="font-semibold text-gray-900 mb-3">👥 Sample Teams (first 5)</h3>
+                        <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 mt-4">
+                            <h3 className="font-semibold text-white mb-3">👥 Sample Teams (first 5)</h3>
                             <ul className="space-y-2 text-sm">
                                 {parsedData.teams.slice(0, 5).map((team) => (
                                     <li key={team.teamId} className="flex justify-between">
-                                        <span className="text-gray-700">{team.teamName}</span>
-                                        <span className="text-gray-500">{team.members.length} members</span>
+                                        <span className="text-zinc-300">{team.teamName}</span>
+                                        <span className="text-zinc-500">{team.members.length} members</span>
                                     </li>
                                 ))}
                                 {parsedData.teams.length > 5 && (
-                                    <li className="text-gray-500 italic">... and {parsedData.teams.length - 5} more</li>
+                                    <li className="text-zinc-500 italic">... and {parsedData.teams.length - 5} more</li>
                                 )}
                             </ul>
                         </div>
@@ -324,13 +324,13 @@ export default function BulkUpload() {
                         <div className="flex gap-3 mt-6">
                             <button
                                 onClick={handleConfirm}
-                                className="flex-1 bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors"
+                                className="flex-1 bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors"
                             >
                                 ✓ Confirm Upload
                             </button>
                             <button
                                 onClick={handleCancel}
-                                className="flex-1 bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors"
+                                className="flex-1 bg-zinc-800 border border-zinc-700 text-zinc-300 font-semibold py-3 px-6 rounded-lg hover:bg-zinc-700 transition-colors"
                             >
                                 ✕ Cancel
                             </button>
@@ -341,13 +341,13 @@ export default function BulkUpload() {
 
             {/* Step 3: Uploading with Progress */}
             {step === 'uploading' && progress && (
-                <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Uploading Teams...</h2>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg p-8 w-full">
+                    <h2 className="text-2xl font-bold text-white mb-6">Uploading Teams...</h2>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-gray-200 rounded-full h-6 mb-4 overflow-hidden">
+                    <div className="w-full bg-zinc-800 rounded-full h-6 mb-4 overflow-hidden">
                         <div
-                            className="bg-gradient-to-r from-indigo-500 to-purple-600 h-6 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-3"
+                            className="bg-gradient-to-r from-red-600 to-red-700 h-6 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-3"
                             style={{ width: `${progress.percentage}%` }}
                         >
                             <span className="text-white text-xs font-bold">
@@ -358,41 +358,41 @@ export default function BulkUpload() {
 
                     {/* Stats */}
                     <div className="flex justify-between text-lg mb-4">
-                        <span className="text-gray-700">
-                            <span className="font-bold text-indigo-600">{progress.currentIndex}</span> / {progress.totalTeams} teams
+                        <span className="text-zinc-300">
+                            <span className="font-bold text-red-500">{progress.currentIndex}</span> / {progress.totalTeams} teams
                         </span>
-                        <span className="text-gray-600">{progress.percentage}%</span>
+                        <span className="text-zinc-400">{progress.percentage}%</span>
                     </div>
 
                     {/* Current Team */}
-                    <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-                        <p className="text-sm text-gray-600 mb-1">Currently processing:</p>
-                        <p className="text-lg font-bold text-indigo-900">{progress.currentTeam}</p>
+                    <div className="bg-red-950/30 border border-red-800/50 rounded-lg p-4">
+                        <p className="text-sm text-zinc-400 mb-1">Currently processing:</p>
+                        <p className="text-lg font-bold text-white">{progress.currentTeam}</p>
                     </div>
                 </div>
             )}
 
             {/* Step 4: Results */}
             {step === 'complete' && result && (
-                <div className="max-w-2xl space-y-6">
-                    <div className={`p-6 rounded-lg shadow ${result.error_count > 0 ? 'bg-yellow-50' : 'bg-green-50'}`}>
-                        <h3 className="text-xl font-semibold mb-4">Upload Complete!</h3>
+                <div className="max-w-full space-y-6">
+                    <div className={`p-6 rounded-lg border ${result.error_count > 0 ? 'bg-yellow-950/30 border-yellow-800/50' : 'bg-green-950/30 border-green-800/50'}`}>
+                        <h3 className="text-xl font-semibold mb-4 text-white">Upload Complete!</h3>
                         <div className="space-y-2">
-                            <p className="text-lg">✅ Successfully created: <strong>{result.success_count}</strong> teams</p>
-                            <p className="text-lg">❌ Errors: <strong>{result.error_count}</strong></p>
-                            <p className="text-lg">📊 Total teams in file: <strong>{result.total_teams}</strong></p>
+                            <p className="text-lg text-zinc-300">✅ Successfully created: <strong className="text-green-400">{result.success_count}</strong> teams</p>
+                            <p className="text-lg text-zinc-300">❌ Errors: <strong className="text-red-400">{result.error_count}</strong></p>
+                            <p className="text-lg text-zinc-300">📊 Total teams in file: <strong className="text-white">{result.total_teams}</strong></p>
                         </div>
                     </div>
 
                     {result.errors && result.errors.length > 0 && (
-                        <div className="bg-red-50 p-4 rounded-lg">
-                            <h4 className="font-semibold text-red-800 mb-2">Errors:</h4>
-                            <ul className="text-sm text-red-700 space-y-1">
+                        <div className="bg-red-950/30 border border-red-800/50 p-4 rounded-lg">
+                            <h4 className="font-semibold text-red-400 mb-2">Errors:</h4>
+                            <ul className="text-sm text-red-300 space-y-1">
                                 {result.errors.slice(0, 10).map((error, i) => (
                                     <li key={i}>• {error}</li>
                                 ))}
                                 {result.errors.length > 10 && (
-                                    <li className="text-red-600 italic">... and {result.errors.length - 10} more</li>
+                                    <li className="text-red-400 italic">... and {result.errors.length - 10} more</li>
                                 )}
                             </ul>
                         </div>
@@ -400,7 +400,7 @@ export default function BulkUpload() {
 
                     <button
                         onClick={handleCancel}
-                        className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors"
+                        className="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors"
                     >
                         Upload Another File
                     </button>
@@ -409,9 +409,9 @@ export default function BulkUpload() {
 
             {/* Danger Zone - Clear Data */}
             {(step === 'select' || step === 'complete') && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-2xl mt-6">
-                    <h3 className="font-semibold text-red-900 mb-2">⚠️ Danger Zone</h3>
-                    <p className="text-sm text-red-800 mb-3">
+                <div className="bg-red-950/30 border border-red-800/50 rounded-lg p-4 w-full mt-6">
+                    <h3 className="font-semibold text-red-400 mb-2">⚠️ Danger Zone</h3>
+                    <p className="text-sm text-red-300 mb-3">
                         Clear all teams and members from the database. This action cannot be undone.
                     </p>
                     <button
@@ -424,9 +424,9 @@ export default function BulkUpload() {
             )}
 
             {/* CSV Format Info */}
-            <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl">
-                <h3 className="font-semibold text-blue-900 mb-2">📝 CSV Format Requirements</h3>
-                <p className="text-sm text-blue-800">
+            <div className="mt-8 bg-blue-950/30 border border-blue-800/50 rounded-lg p-4 w-full">
+                <h3 className="font-semibold text-blue-400 mb-2">📝 CSV Format Requirements</h3>
+                <p className="text-sm text-blue-300">
                     The CSV should have 19 columns with team members on separate rows.
                     Members with the same Team ID will be grouped together.
                     The system will automatically identify the team leader based on the "User Type" column.

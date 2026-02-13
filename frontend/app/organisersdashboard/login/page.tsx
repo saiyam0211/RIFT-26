@@ -50,22 +50,31 @@ export default function AdminLogin() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-blue-600 to-pink-500">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
+            {/* Animated Background */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-0 -left-4 w-96 h-96 bg-red-600/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+                <div className="absolute top-0 -right-4 w-96 h-96 bg-red-800/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+                <div className="absolute -bottom-8 left-20 w-96 h-96 bg-red-900/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+            </div>
+
+            {/* Login Card */}
+            <div className="relative z-10 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl p-8 w-full max-w-md backdrop-blur-xl">
+                {/* Logo Section */}
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">RIFT '26 Admin</h1>
-                    <p className="text-gray-600 mt-2">Sign in to access admin panel</p>
+                    <h1 className="text-3xl font-bold text-white mb-2 font-tan">RIFT '26</h1>
+                    <p className="text-zinc-400">Sign in to access admin panel</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        <div className="bg-red-950/50 border border-red-800/50 text-red-400 px-4 py-3 rounded-lg backdrop-blur-sm">
                             {error}
                         </div>
                     )}
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
                             Email Address
                         </label>
                         <input
@@ -73,13 +82,13 @@ export default function AdminLogin() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="admin@shift.com"
+                            className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent transition-all placeholder:text-zinc-600"
+                            placeholder="Your Admin Email ID"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
                             Password
                         </label>
                         <input
@@ -87,7 +96,7 @@ export default function AdminLogin() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent transition-all placeholder:text-zinc-600"
                             placeholder="••••••••"
                         />
                     </div>
@@ -95,13 +104,38 @@ export default function AdminLogin() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-600/30 hover:shadow-red-600/50"
                     >
                         {loading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
+                {/* Footer */}
+                <div className="mt-6 pt-6 border-t border-zinc-800">
+                    <p className="text-center text-zinc-500 text-sm">
+                        Secure admin access • RIFT 2026
+                    </p>
+                </div>
             </div>
+
+            {/* CSS for animations */}
+            <style jsx>{`
+                @keyframes blob {
+                    0% { transform: translate(0px, 0px) scale(1); }
+                    33% { transform: translate(30px, -50px) scale(1.1); }
+                    66% { transform: translate(-20px, 20px) scale(0.9); }
+                    100% { transform: translate(0px, 0px) scale(1); }
+                }
+                .animate-blob {
+                    animation: blob 7s infinite;
+                }
+                .animation-delay-2000 {
+                    animation-delay: 2s;
+                }
+                .animation-delay-4000 {
+                    animation-delay: 4s;
+                }
+            `}</style>
         </div>
     );
 }

@@ -199,7 +199,7 @@ export default function DashboardPage() {
                 </button>
 
                 {/* Raise Ticket - Only for Leaders */}
-                
+
             </div>
 
             {/* QR Code Modal */}
@@ -379,7 +379,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right Side - Details */}
-            <div className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center mt-0 md:mt-32 py-8 lg:py-12">
+            <div className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center mt-0 md:mt-20 py-8 lg:py-12">
                 <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
 
                     {/* Team Members */}
@@ -409,6 +409,116 @@ export default function DashboardPage() {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Venue Location Map */}
+                    {team.city && (
+                        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                            <div className="p-6 pb-4">
+                                <h3 className="text-white text-xl font-semibold mb-2">Event Venue</h3>
+                                <p className="text-gray-400 text-sm mb-4">
+                                    {getCityName(team.city)} • {
+                                        team.city === 'BLR' ? 'Brigade Signature Towers' :
+                                            team.city === 'NOIDA' ? 'PW Institute of Innovation, Sector 126' :
+                                                team.city === 'LKO' ? 'PW Institute of Innovation, Platinum Mall' :
+                                                    team.city === 'PUNE' ? 'PW Institute of Innovation, Hadapsar' :
+                                                        'Event Venue'
+                                    }
+                                </p>
+                            </div>
+
+                            {/* Map Container */}
+                            <div className="relative w-full h-64 bg-zinc-900/50">
+                                {team.city === 'BLR' && (
+                                    <iframe
+                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3886.71142943678!2d77.75899707612388!3d13.05403131306355!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae0fb237cef1db%3A0x11bf34bc04656e35!2sBrigade%20Signature%20Towers!5e0!3m2!1sen!2sin!4v1770558674479!5m2!1sen!2sin"
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        allowFullScreen
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        className="absolute inset-0"
+                                    />
+                                )}
+                                {team.city === 'NOIDA' && (
+                                    <iframe
+                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1395.5331843928445!2d77.33081878578959!3d28.541194545039666!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390ce79f30e621e9%3A0x1591141e17c28c44!2sPW%20Institute%20of%20Innovation%20Noida%20(Sector%20126)%20%7C%7C%20SOH%2C%20SOT%20%26%20SOM!5e0!3m2!1sen!2sin!4v1770558696859!5m2!1sen!2sin"
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        allowFullScreen
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        className="absolute inset-0"
+                                    />
+                                )}
+                                {team.city === 'LKO' && (
+                                    <iframe
+                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3561.758382525704!2d80.98929407633487!3d26.78397076560959!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399be5b28343ce19%3A0x937e2dd34aaa824b!2sPW%20Institute%20of%20Innovation%20Lucknow%20(Platinum%20Mall)%20%7C%7C%20SOH%2C%20SOT%20%26%20SOM!5e0!3m2!1sen!2sin!4v1770558717283!5m2!1sen!2sin"
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        allowFullScreen
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        className="absolute inset-0"
+                                    />
+                                )}
+                                {team.city === 'PUNE' && (
+                                    <iframe
+                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3783.4877844749512!2d73.90537447618597!3d18.506846669591486!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2c1f8d79149e3%3A0x5f87d2a08053b873!2sPW%20Institute%20of%20Innovation%20Pune%20(Hadapsar)%20%7C%7C%20SOH%2C%20SOT%20%26%20SOM!5e0!3m2!1sen!2sin!4v1770558739575!5m2!1sen!2sin"
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        allowFullScreen
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        className="absolute inset-0"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Get Directions Button */}
+                            <div className="p-4 bg-white/5 border-t border-white/10">
+                                <button
+                                    onClick={() => {
+                                        const venueCoords = {
+                                            'BLR': '13.054031,77.760997',
+                                            'NOIDA': '28.541195,77.332819',
+                                            'LKO': '26.783971,80.991294',
+                                            'PUNE': '18.506847,73.907374'
+                                        };
+                                        const coords = venueCoords[team.city as keyof typeof venueCoords];
+                                        if (coords) {
+                                            window.open(`https://www.google.com/maps/dir/?api=1&destination=${coords}`, '_blank');
+                                        }
+                                    }}
+                                    className="w-full bg-[#c0211f] hover:bg-[#a01b1a] text-white py-3 px-4 rounded-lg transition font-medium flex items-center justify-center gap-2 group"
+                                >
+                                    <svg
+                                        className="w-5 h-5 group-hover:scale-110 transition-transform"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                        />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                    </svg>
+                                    Get Directions
+                                </button>
                             </div>
                         </div>
                     )}

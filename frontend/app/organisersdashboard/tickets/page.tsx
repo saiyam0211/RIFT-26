@@ -92,7 +92,7 @@ export default function TicketsPage() {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
             </div>
         );
     }
@@ -101,14 +101,14 @@ export default function TicketsPage() {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Support Tickets</h1>
-                    <p className="text-gray-600 mt-1">{tickets.length} total tickets</p>
+                    <h1 className="text-3xl font-bold text-white">Support Tickets</h1>
+                    <p className="text-zinc-400 mt-1">{tickets.length} total tickets</p>
                 </div>
 
                 <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                 >
                     <option value="all">All Tickets</option>
                     <option value="open">Open</option>
@@ -118,22 +118,22 @@ export default function TicketsPage() {
             </div>
 
             {tickets.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-lg shadow">
-                    <p className="text-gray-500 text-lg">No tickets found</p>
+                <div className="text-center py-12 bg-zinc-900 border border-zinc-800 rounded-lg">
+                    <p className="text-zinc-500 text-lg">No tickets found</p>
                 </div>
             ) : (
                 <div className="grid gap-4">
                     {tickets.map((ticket) => (
                         <div
                             key={ticket.id}
-                            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                            className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-red-600/50 transition-all"
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                    <h3 className="text-xl font-semibold text-white mb-2">
                                         {ticket.subject}
                                     </h3>
-                                    <div className="flex gap-3 text-sm text-gray-600">
+                                    <div className="flex gap-3 text-sm text-zinc-400">
                                         <span>🏢 {ticket.team?.team_name || 'Unknown Team'}</span>
                                         {ticket.team?.city && <span>📍 {ticket.team.city}</span>}
                                         <span>👥 {ticket.team?.member_count || 0} members</span>
@@ -144,21 +144,21 @@ export default function TicketsPage() {
                                 </span>
                             </div>
 
-                            <p className="text-gray-700 mb-4">{ticket.message || ticket.description}</p>
+                            <p className="text-zinc-300 mb-4">{ticket.message || ticket.description}</p>
 
                             {ticket.resolution && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                                    <p className="text-sm font-semibold text-green-900 mb-1">Resolution:</p>
-                                    <p className="text-green-800">{ticket.resolution}</p>
+                                <div className="bg-green-950/30 border border-green-800/50 rounded-lg p-4 mb-4">
+                                    <p className="text-sm font-semibold text-green-400 mb-1">Resolution:</p>
+                                    <p className="text-green-300">{ticket.resolution}</p>
                                     {ticket.resolved_by_email && (
-                                        <p className="text-xs text-green-600 mt-2">
+                                        <p className="text-xs text-green-500 mt-2">
                                             Resolved by {ticket.resolved_by_email}
                                         </p>
                                     )}
                                 </div>
                             )}
 
-                            <div className="flex justify-between items-center text-sm text-gray-500">
+                            <div className="flex justify-between items-center text-sm text-zinc-500">
                                 <span>Created: {new Date(ticket.created_at).toLocaleString()}</span>
                                 {ticket.status !== 'resolved' && (
                                     <button
@@ -166,7 +166,7 @@ export default function TicketsPage() {
                                             setSelectedTicket(ticket);
                                             setShowResolveModal(true);
                                         }}
-                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                                     >
                                         Resolve Ticket
                                     </button>
@@ -180,19 +180,19 @@ export default function TicketsPage() {
             {/* Resolve Modal */}
             {showResolveModal && selectedTicket && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
-                        <h2 className="text-2xl font-bold mb-4">Resolve Ticket</h2>
-                        <p className="text-gray-600 mb-6">{selectedTicket.subject}</p>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-8 max-w-2xl w-full mx-4">
+                        <h2 className="text-2xl font-bold mb-4 text-white">Resolve Ticket</h2>
+                        <p className="text-zinc-400 mb-6">{selectedTicket.subject}</p>
 
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
                                 Resolution Message
                             </label>
                             <textarea
                                 value={resolution}
                                 onChange={(e) => setResolution(e.target.value)}
                                 rows={4}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                                 placeholder="Explain how the issue was resolved..."
                             />
                         </div>
@@ -203,9 +203,9 @@ export default function TicketsPage() {
                                     type="checkbox"
                                     checked={sendEmail}
                                     onChange={(e) => setSendEmail(e.target.checked)}
-                                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
                                 />
-                                <span className="ml-2 text-sm text-gray-700">
+                                <span className="ml-2 text-sm text-zinc-300">
                                     Send email notification to team leader
                                 </span>
                             </label>
@@ -215,16 +215,16 @@ export default function TicketsPage() {
                                     type="checkbox"
                                     checked={allowEdit}
                                     onChange={(e) => setAllowEdit(e.target.checked)}
-                                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
                                 />
-                                <span className="ml-2 text-sm text-gray-700">
+                                <span className="ml-2 text-sm text-zinc-300">
                                     Allow team to edit details temporarily
                                 </span>
                             </label>
 
                             {allowEdit && (
                                 <div className="ml-6">
-                                    <label className="block text-sm text-gray-600 mb-1">
+                                    <label className="block text-sm text-zinc-400 mb-1">
                                         Edit permission duration (minutes)
                                     </label>
                                     <input
@@ -233,7 +233,7 @@ export default function TicketsPage() {
                                         onChange={(e) => setEditMinutes(parseInt(e.target.value) || 30)}
                                         min="5"
                                         max="1440"
-                                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                        className="w-32 px-3 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600"
                                     />
                                 </div>
                             )}
@@ -243,7 +243,7 @@ export default function TicketsPage() {
                             <button
                                 onClick={handleResolve}
                                 disabled={!resolution}
-                                className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 Resolve Ticket
                             </button>
@@ -252,7 +252,7 @@ export default function TicketsPage() {
                                     setShowResolveModal(false);
                                     setResolution('');
                                 }}
-                                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                                className="px-6 py-3 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-700 transition-colors"
                             >
                                 Cancel
                             </button>

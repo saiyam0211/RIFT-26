@@ -16,7 +16,7 @@ export default function AddTeamManually() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    
+
     const [teamName, setTeamName] = useState('');
     const [city, setCity] = useState<string>('');
     const [rsvpCompleted, setRsvpCompleted] = useState(false);
@@ -58,7 +58,7 @@ export default function AddTeamManually() {
             setError('Team name is required');
             return false;
         }
-        
+
         if (rsvpCompleted && !city) {
             setError('City is required for teams with completed RSVP');
             return false;
@@ -119,7 +119,7 @@ export default function AddTeamManually() {
         try {
             const token = getAdminToken();
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-            
+
             // Prepare request body
             const requestBody = {
                 team_name: teamName,
@@ -148,12 +148,12 @@ export default function AddTeamManually() {
                 throw new Error(data.error || 'Failed to add team');
             }
 
-            const successMsg = rsvpCompleted 
+            const successMsg = rsvpCompleted
                 ? `Team "${teamName}" created successfully with RSVP completed! They can now access the dashboard.`
                 : `Team "${teamName}" created successfully! They can now complete their RSVP.`;
-            
+
             setSuccess(successMsg);
-            
+
             // Reset form after 2 seconds
             setTimeout(() => {
                 router.push('/organisersdashboard/teams');
@@ -171,21 +171,21 @@ export default function AddTeamManually() {
             <div className="mb-8">
                 <button
                     onClick={() => router.back()}
-                    className="text-purple-600 hover:text-purple-800 flex items-center gap-2 mb-4"
+                    className="text-red-500 hover:text-red-400 flex items-center gap-2 mb-4"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                     Back to Teams
                 </button>
-                <h1 className="text-3xl font-bold text-gray-900">Add Team Manually</h1>
-                <p className="text-gray-600 mt-2">Create a new team by filling in the details below</p>
+                <h1 className="text-3xl font-bold text-white">Add Team Manually</h1>
+                <p className="text-zinc-400 mt-2">Create a new team by filling in the details below</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Success Message */}
                 {success && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                    <div className="bg-green-950/30 border border-green-800/50 text-green-400 px-4 py-3 rounded-lg flex items-start gap-2">
                         <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
@@ -195,7 +195,7 @@ export default function AddTeamManually() {
 
                 {/* Error Message */}
                 {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                    <div className="bg-red-950/30 border border-red-800/50 text-red-400 px-4 py-3 rounded-lg flex items-start gap-2">
                         <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -204,18 +204,18 @@ export default function AddTeamManually() {
                 )}
 
                 {/* Team Details */}
-                <div className="bg-white rounded-lg shadow p-6 space-y-4">
-                    <h2 className="text-xl font-semibold text-gray-900">Team Information</h2>
-                    
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow p-6 space-y-4">
+                    <h2 className="text-xl font-semibold text-white">Team Information</h2>
+
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
                             Team Name *
                         </label>
                         <input
                             type="text"
                             value={teamName}
                             onChange={(e) => setTeamName(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                             placeholder="Enter team name"
                             required
                         />
@@ -227,22 +227,22 @@ export default function AddTeamManually() {
                             id="rsvpCompleted"
                             checked={rsvpCompleted}
                             onChange={(e) => setRsvpCompleted(e.target.checked)}
-                            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                            className="w-4 h-4 text-red-600 border-zinc-700 rounded focus:ring-red-500"
                         />
-                        <label htmlFor="rsvpCompleted" className="text-sm font-medium text-gray-700">
+                        <label htmlFor="rsvpCompleted" className="text-sm font-medium text-zinc-300">
                             Mark RSVP as completed (team can participate directly)
                         </label>
                     </div>
 
                     {rsvpCompleted && (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
                                 City *
                             </label>
                             <select
                                 value={city}
                                 onChange={(e) => setCity(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                                 required={rsvpCompleted}
                             >
                                 <option value="">Select City</option>
@@ -255,14 +255,14 @@ export default function AddTeamManually() {
                 </div>
 
                 {/* Team Members */}
-                <div className="bg-white rounded-lg shadow p-6 space-y-6">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow p-6 space-y-6">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-semibold text-gray-900">Team Members ({members.length}/4)</h2>
+                        <h2 className="text-xl font-semibold text-white">Team Members ({members.length}/4)</h2>
                         {members.length < 4 && (
                             <button
                                 type="button"
                                 onClick={addMember}
-                                className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-green-800 transition-all flex items-center gap-2 text-sm"
+                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -273,16 +273,16 @@ export default function AddTeamManually() {
                     </div>
 
                     {members.map((member, index) => (
-                        <div key={index} className="p-4 border-2 border-gray-200 rounded-lg space-y-3 relative">
+                        <div key={index} className="p-4 border-2 border-zinc-800 rounded-lg space-y-3 relative">
                             <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-semibold text-gray-900">
-                                    {index === 0 ? '👑 Team Leader' : `Member ${index + 1}`}
+                                <h3 className="font-semibold text-white">
+                                    {index === 0 ? 'Team Leader' : `Member ${index + 1}`}
                                 </h3>
                                 {index > 0 && members.length > 2 && (
                                     <button
                                         type="button"
                                         onClick={() => removeMember(index)}
-                                        className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
+                                        className="text-red-500 hover:text-red-400 text-sm flex items-center gap-1"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -294,35 +294,35 @@ export default function AddTeamManually() {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-zinc-300 mb-1">
                                         Full Name *
                                     </label>
                                     <input
                                         type="text"
                                         value={member.name}
                                         onChange={(e) => updateMember(index, 'name', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                                         placeholder="Enter full name"
                                         required
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-zinc-300 mb-1">
                                         Email Address *
                                     </label>
                                     <input
                                         type="email"
                                         value={member.email}
                                         onChange={(e) => updateMember(index, 'email', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                                         placeholder="email@example.com"
                                         required
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-zinc-300 mb-1">
                                         Phone Number *
                                     </label>
                                     <input
@@ -332,7 +332,7 @@ export default function AddTeamManually() {
                                             const cleaned = e.target.value.replace(/\D/g, '');
                                             updateMember(index, 'phone', cleaned.slice(0, 10));
                                         }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                                         placeholder="9876543210"
                                         maxLength={10}
                                         required
@@ -342,8 +342,8 @@ export default function AddTeamManually() {
                         </div>
                     ))}
 
-                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                        <p className="text-sm text-blue-800">
+                    <div className="bg-blue-950/30 border border-blue-800/50 p-4 rounded-lg">
+                        <p className="text-sm text-blue-300">
                             ℹ️ Teams must have 2-4 members. The first member is automatically designated as the team leader.
                         </p>
                     </div>
@@ -354,14 +354,14 @@ export default function AddTeamManually() {
                     <button
                         type="button"
                         onClick={() => router.back()}
-                        className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-semibold"
+                        className="flex-1 px-6 py-3 border-2 border-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-900 transition-all font-semibold"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-red-600/30"
                     >
                         {loading ? (
                             <span className="flex items-center justify-center gap-2">

@@ -49,21 +49,21 @@ export default function AnnouncementsPage() {
     return (
         <div>
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">Announcements</h1>
+                <h1 className="text-3xl font-bold text-white">Announcements</h1>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                    className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
                 >
                     {showForm ? 'Cancel' : '+ New Announcement'}
                 </button>
             </div>
 
             {showForm && (
-                <div className="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 className="text-xl font-semibold mb-4">Create Announcement</h2>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-6">
+                    <h2 className="text-xl font-semibold mb-4 text-white">Create Announcement</h2>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
                                 Title
                             </label>
                             <input
@@ -71,11 +71,11 @@ export default function AnnouncementsPage() {
                                 value={formData.title}
                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                 required
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
                                 Content
                             </label>
                             <textarea
@@ -83,11 +83,11 @@ export default function AnnouncementsPage() {
                                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                 required
                                 rows={4}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
                                 Priority (1-5)
                             </label>
                             <input
@@ -96,12 +96,12 @@ export default function AnnouncementsPage() {
                                 max="5"
                                 value={formData.priority}
                                 onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
                             />
                         </div>
                         <button
                             type="submit"
-                            className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
                         >
                             Create Announcement
                         </button>
@@ -111,27 +111,27 @@ export default function AnnouncementsPage() {
 
             <div className="space-y-4">
                 {announcements.map((announcement) => (
-                    <div key={announcement.id} className="bg-white rounded-lg shadow p-6">
+                    <div key={announcement.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
                         <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-lg font-semibold">{announcement.title}</h3>
+                            <h3 className="text-lg font-semibold text-white">{announcement.title}</h3>
                             <div className="flex items-center gap-2">
-                                <span className={`px-2 py-1 text-xs font-semibold rounded ${announcement.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                <span className={`px-2 py-1 text-xs font-semibold rounded ${announcement.is_active ? 'bg-green-900/50 border border-green-800/50 text-green-400' : 'bg-zinc-800 text-zinc-400'
                                     }`}>
                                     {announcement.is_active ? 'Active' : 'Inactive'}
                                 </span>
-                                <span className="px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800">
+                                <span className="px-2 py-1 text-xs font-semibold rounded bg-red-900/50 border border-red-800/50 text-red-400">
                                     Priority: {announcement.priority}
                                 </span>
                             </div>
                         </div>
-                        <p className="text-gray-700 whitespace-pre-wrap">{announcement.content}</p>
-                        <div className="mt-4 text-xs text-gray-500">
+                        <p className="text-zinc-300 whitespace-pre-wrap">{announcement.content}</p>
+                        <div className="mt-4 text-xs text-zinc-500">
                             Created: {new Date(announcement.created_at).toLocaleString()}
                         </div>
                     </div>
                 ))}
                 {announcements.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
+                    <div className="text-center py-12 text-zinc-500">
                         No announcements yet
                     </div>
                 )}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -32,10 +33,14 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		// Validate JWT
 		claims, err := utils.ValidateJWT(token, jwtSecret)
 		if err != nil {
+			fmt.Printf("[AuthMiddleware] Token Validation Failed: %v\n", err)
 			c.JSON(401, gin.H{"error": "Invalid or expired token"})
 			c.Abort()
 			return
 		}
+
+		// Debug Log
+		fmt.Printf("[AuthMiddleware] Success. UserID: %v, Role: %v, Email: %s\n", claims.UserID, claims.Role, claims.Email)
 
 		// Set user info in context
 		c.Set("user_id", claims.UserID)
@@ -54,12 +59,15 @@ func RoleMiddleware(allowedRoles ...models.UserRole) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roleValue, exists := c.Get("role")
 		if !exists {
+			fmt.Println("[RoleMiddleware] Role not found in context")
 			c.JSON(403, gin.H{"error": "Forbidden: role not found"})
 			c.Abort()
 			return
 		}
 
 		userRole := roleValue.(models.UserRole)
+		fmt.Printf("[RoleMiddleware] Checking Role. UserRole: %v, Allowed: %v\n", userRole, allowedRoles)
+
 		for _, role := range allowedRoles {
 			if userRole == role {
 				c.Next()
@@ -67,6 +75,7 @@ func RoleMiddleware(allowedRoles ...models.UserRole) gin.HandlerFunc {
 			}
 		}
 
+		fmt.Printf("[RoleMiddleware] Access Denied. UserRole: %v != Allowed: %v\n", userRole, allowedRoles)
 		c.JSON(403, gin.H{"error": "Forbidden: insufficient permissions"})
 		c.Abort()
 	}

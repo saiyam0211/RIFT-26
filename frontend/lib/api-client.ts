@@ -12,7 +12,9 @@ export const apiClient = axios.create({
 // Add request interceptor to attach JWT token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token')
+    // Check for participant token first, then volunteer token
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('volunteer_token')
+    console.log('[apiClient] Token found:', token ? `${token.substring(0, 20)}...` : 'NONE')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -28,10 +30,23 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('team_data')
-      window.location.href = '/'
+      // Check if this is a volunteer or participant
+      const isVolunteer = localStorage.getItem('volunteer_token')
+      
+      console.error('[apiClient] 401 ERROR - Unauthorized')
+      console.error('[apiClient] Is Volunteer:', !!isVolunteer)
+      console.error('[apiClient] Error details:', error.response?.data)
+      
+      // TEMPORARILY DISABLED FOR DEBUGGING - WILL RE-ENABLE AFTER FIXING AUTH
+      // if (isVolunteer) {
+      //   localStorage.removeItem('volunteer_token')
+      //   localStorage.removeItem('volunteer_user')
+      //   window.location.href = '/volunteer/login'
+      // } else {
+      //   localStorage.removeItem('auth_token')
+      //   localStorage.removeItem('team_data')
+      //   window.location.href = '/'
+      // }
     }
     return Promise.reject(error)
   }

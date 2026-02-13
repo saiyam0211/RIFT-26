@@ -46,6 +46,8 @@ func main() {
 	announcementRepo := repository.NewAnnouncementRepository(db)
 	otpRepo := repository.NewOTPRepository(db)
 	userRepo := repository.NewUserRepository(db)
+	volunteerRepo := repository.NewVolunteerRepository(db)
+	eventTableRepo := repository.NewEventTableRepository(db.DB)
 
 	// Initialize services
 	teamService := services.NewTeamService(teamRepo, announcementRepo)
@@ -53,16 +55,23 @@ func main() {
 	emailOTPService := services.NewEmailOTPService(otpRepo, teamRepo, emailService, cfg.JWTSecret, cfg.EnableEmailOTP)
 	ticketService := services.NewTicketService(db.DB, emailService)
 	announcementService := services.NewAnnouncementService(db.DB)
+	volunteerService := services.NewVolunteerService(volunteerRepo)
+	eventTableService := services.NewEventTableService(eventTableRepo)
+
+	// Initialize participant check-in repository
+	participantCheckinRepo := repository.NewParticipantCheckInRepository(db.DB)
 
 	// Initialize handlers
 	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange)
 	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
-	volunteerHandler := handlers.NewVolunteerHandler(checkinService)
+	scannerHandler := handlers.NewVolunteerHandler(checkinService, participantCheckinRepo, teamRepo, volunteerRepo) // Enhanced scanner/check-in handler
+	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)                                      // Volunteer auth handler
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
 	ticketHandler := handlers.NewTicketHandler(ticketService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementService)
 	bulkEmailHandler := handlers.NewBulkEmailHandler(db.DB, emailService, announcementService)
+	eventTableHandler := handlers.NewEventTableHandler(eventTableService)
 
 	// Setup Gin router
 	if cfg.Environment == "production" {
@@ -131,13 +140,34 @@ func main() {
 			authRoutes.POST("/validate-rsvp-pin", middleware.RateLimitMiddleware(10, 1*time.Minute), rsvpPinHandler.ValidatePIN)
 		}
 
-		// Volunteer routes (protected)
+		// Volunteer login (public)
+		v1.POST("/volunteer/login", volunteerAuthHandler.Login)
+
+		// Volunteer routes (protected by volunteer auth)
+		volunteerRoutes := v1.Group("/volunteer")
+		volunteerRoutes.Use(middleware.VolunteerAuthMiddleware(volunteerService))
+		{
+			volunteerRoutes.GET("/verify", volunteerAuthHandler.VerifyToken)
+		}
+
+		// Check-in routes (protected - enhanced with participant selection)
 		checkinRoutes := v1.Group("/checkin")
 		checkinRoutes.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		checkinRoutes.Use(middleware.RoleMiddleware("volunteer", "admin"))
 		{
-			checkinRoutes.POST("/scan", volunteerHandler.ScanQR)
-			checkinRoutes.POST("/confirm", volunteerHandler.ConfirmCheckin)
+			checkinRoutes.POST("/scan", scannerHandler.ScanQR)                      // Scan QR and get team details
+			checkinRoutes.POST("/participants", scannerHandler.CheckInParticipants) // Check in selected participants
+			checkinRoutes.GET("/history", scannerHandler.GetCheckInHistory)         // Get check-in history
+			checkinRoutes.DELETE("/:team_id", scannerHandler.UndoCheckIn)           // Undo a check-in
+		}
+
+		// Table viewer routes (protected)
+		tableRoutes := v1.Group("/table")
+		tableRoutes.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		tableRoutes.Use(middleware.RoleMiddleware("volunteer", "admin"))
+		{
+			tableRoutes.POST("/confirm", scannerHandler.ConfirmTable)   // Mark team as done
+			tableRoutes.GET("/pending", scannerHandler.GetPendingTeams) // Get pending teams
 		}
 
 		// Admin login (public)
@@ -174,6 +204,21 @@ func main() {
 
 			// RSVP PIN (when RSVP_OPEN=pin)
 			adminRoutes.GET("/rsvp-pin", rsvpPinHandler.GetRSVPPin)
+
+			// Volunteer Management
+			adminRoutes.POST("/volunteers", volunteerAuthHandler.CreateVolunteer)
+			adminRoutes.GET("/volunteers", volunteerAuthHandler.GetAllVolunteers)
+			adminRoutes.GET("/volunteers/:id", volunteerAuthHandler.GetVolunteerByID)
+			adminRoutes.GET("/volunteers/:id/logs", scannerHandler.GetVolunteerLogs)
+			adminRoutes.PUT("/volunteers/:id", volunteerAuthHandler.UpdateVolunteer)
+			adminRoutes.DELETE("/volunteers/:id", volunteerAuthHandler.DeleteVolunteer)
+
+			// Event Table Management
+			adminRoutes.POST("/tables", eventTableHandler.CreateEventTable)
+			adminRoutes.GET("/tables", eventTableHandler.GetAllEventTables)
+			adminRoutes.GET("/tables/:id", eventTableHandler.GetEventTable)
+			adminRoutes.PUT("/tables/:id", eventTableHandler.UpdateEventTable)
+			adminRoutes.DELETE("/tables/:id", eventTableHandler.DeleteEventTable)
 		}
 	}
 

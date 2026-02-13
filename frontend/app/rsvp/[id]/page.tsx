@@ -37,11 +37,11 @@ export default function RSVPPage() {
             try {
                 const response = await apiClient.get('/config')
                 setCityChangeEnabled(response.data.city_change_enabled || false)
-                
+
                 // Check RSVP mode: only redirect when fully closed ("false"), not when "pin"
                 const rsvpMode = response.data.rsvp_open
                 const isClosed = rsvpMode === false || rsvpMode === 'false'
-                
+
                 if (isClosed && authTeam && !authTeam.rsvp_locked) {
                     router.push('/')
                     return
@@ -70,7 +70,7 @@ export default function RSVPPage() {
         }
 
         setTeam(authTeam)
-        
+
         // Set city to the team's city if it exists, otherwise default to BLR
         if (authTeam.city) {
             const teamCity = authTeam.city.toUpperCase() as 'BLR' | 'PUNE' | 'NOIDA' | 'LKO'
@@ -78,7 +78,7 @@ export default function RSVPPage() {
                 setCity(teamCity)
             }
         }
-        
+
         const sortedMembers = authTeam.members?.map((m) => ({
             id: m.id,
             name: m.name || '',
@@ -105,7 +105,7 @@ export default function RSVPPage() {
             return
         }
         // Generate a valid UUID v4 for new member
-        const newUUID = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const newUUID = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
@@ -328,7 +328,7 @@ export default function RSVPPage() {
                             </button>
 
                             <h2 className="text-white text-2xl font-semibold">Edit Team Members</h2>
-                            
+
                             <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
                                 <p className="text-blue-200 text-sm">
                                     ℹ️ Team leader details (name, email, phone) are locked and cannot be changed. You can add/remove other members and update their contact details.
@@ -340,7 +340,7 @@ export default function RSVPPage() {
                                     <div key={member.id} className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
                                         <div className="flex justify-between items-center">
                                             <h3 className="text-white font-medium">
-                                                {index === 0 ? '👑 Team Leader' : `Member ${index + 1}`}
+                                                {index === 0 ? 'Team Leader' : `Member ${index + 1}`}
                                             </h3>
                                             {index > 0 && (
                                                 <button
@@ -512,13 +512,12 @@ export default function RSVPPage() {
                                             type="button"
                                             onClick={() => cityChangeEnabled && setCity(c.value)}
                                             disabled={!cityChangeEnabled}
-                                            className={`py-4 px-4 rounded-lg font-semibold text-lg transition ${
-                                                !cityChangeEnabled 
-                                                    ? 'cursor-not-allowed opacity-50' 
-                                                    : 'cursor-pointer'
-                                            } ${city === c.value
-                                                ? 'bg-[#c0211f] text-white'
-                                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                            className={`py-4 px-4 rounded-lg font-semibold text-lg transition ${!cityChangeEnabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer'
+                                                } ${city === c.value
+                                                    ? 'bg-[#c0211f] text-white'
+                                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
                                                 }`}
                                         >
                                             {c.label}
