@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS seat_allocations (
     seat_id UUID REFERENCES seats(id) ON DELETE CASCADE,
     block_id UUID REFERENCES blocks(id),
     room_id UUID REFERENCES rooms(id),
-    allocated_by UUID REFERENCES volunteers(id),
+    allocated_by UUID,
     allocated_at TIMESTAMP DEFAULT NOW(),
     team_size INT NOT NULL,
     UNIQUE(team_id)

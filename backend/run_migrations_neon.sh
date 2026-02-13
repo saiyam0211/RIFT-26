@@ -7,7 +7,7 @@ set -e
 
 # Load DATABASE_URL from .env
 if [ -f .env ]; then
-    export $(cat .env | grep DATABASE_URL | xargs)
+    export $(grep -v '^#' .env | grep DATABASE_URL | xargs)
 else
     echo "Error: .env file not found"
     exit 1
