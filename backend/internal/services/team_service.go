@@ -123,6 +123,11 @@ func (s *TeamService) SubmitRSVP2(ctx context.Context, teamID uuid.UUID, userEma
 		return nil, fmt.Errorf("only team leader can submit RSVP II")
 	}
 
+	// At least 2 members must be selected
+	if len(req.SelectedMemberIDs) < 2 {
+		return nil, fmt.Errorf("at least 2 team members must be selected to participate")
+	}
+
 	// Validate selected member IDs exist in team
 	memberMap := make(map[uuid.UUID]bool)
 	for _, member := range members {

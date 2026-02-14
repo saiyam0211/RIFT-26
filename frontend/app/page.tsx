@@ -6,6 +6,19 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import RIFTBackground from '@/components/RIFTBackground';
 import CustomLoader from '@/components/CustomLoader';
+import { Sparkles } from 'lucide-react';
+
+const HACKATHON_DATE = new Date(2026, 1, 19); // Feb 19, 2026 (month 0-indexed)
+const DEADLINE_DATE = new Date(2026, 1, 17, 23, 11); // Feb 17, 2026 11:11 PM
+
+function getDaysLeft(): number {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const target = new Date(HACKATHON_DATE);
+    target.setHours(0, 0, 0, 0);
+    const diff = target.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
 
 interface Team {
     id: string;
@@ -39,6 +52,24 @@ export default function Home() {
     const [pinValue, setPinValue] = useState('');
     const [pinError, setPinError] = useState('');
     const [pinLoading, setPinLoading] = useState(false);
+    const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+    const [daysLeft, setDaysLeft] = useState(0);
+
+    // Show welcome modal once per session when landing on the site
+    useEffect(() => {
+        const seen = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('rift_welcome_seen');
+        if (!seen) {
+            setShowWelcomeModal(true);
+            setDaysLeft(getDaysLeft());
+        }
+    }, []);
+
+    const dismissWelcomeModal = () => {
+        setShowWelcomeModal(false);
+        if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('rift_welcome_seen', 'true');
+        }
+    };
 
     // Debounced autocomplete with loading state
     useEffect(() => {
@@ -305,7 +336,7 @@ export default function Home() {
         } else if (step === 'email' || step === 'verifying') {
             return { number: 2, text: 'Verify Details' };
         } else {
-            return { number: 3, text: 'Complete RSVP' };
+            return { number: 3, text: 'Final Confirmation' };
         }
     };
 
@@ -315,6 +346,56 @@ export default function Home() {
         <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
             {/* LightRays Background */}
             <RIFTBackground />
+
+            {/* Welcome to RIFT modal */}
+            {showWelcomeModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                    <div className="bg-gradient-to-b from-gray-900 to-gray-950 border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
+                        <div className="relative p-8">
+                            {/* Decorative corner accent */}
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-[#c0211f]/10 rounded-bl-full" />
+                            <div className="absolute bottom-0 left-0 w-20 h-20 bg-[#c0211f]/5 rounded-tr-full" />
+
+                            <div className="flex items-center justify-center gap-2 mb-6">
+                                <Sparkles className="text-[#c0211f]" size={28} />
+                                <h2 className="text-2xl font-bold text-white">Welcome to RIFT</h2>
+                                <Sparkles className="text-[#c0211f]" size={28} />
+                            </div>
+
+                            <p className="text-gray-300 text-center text-sm leading-relaxed mb-4">
+                                If you&apos;re opening this website now, that means only <span className="text-[#c0211f] font-bold text-lg">{daysLeft} days</span> are left until the big day, and we&apos;re so glad you&apos;re here!
+                            </p>
+
+                            <p className="text-gray-300 text-sm leading-relaxed mb-4">
+                                Hope you filled the RSVP form previously, that&apos;s why you&apos;re here! You&apos;re now just <strong className="text-white">one step</strong> behind joining the great <strong className="text-white">PAN India hackathon</strong>.
+                            </p>
+
+                            <p className="text-gray-300 text-sm leading-relaxed mb-4">
+                                We just need your <strong className="text-white">final confirmation</strong> on how many team members are coming so we can plan our arrangements accordingly. This is the final call: <strong className="text-white">search for your team</strong>, enter your email, give your final confirmation, and you&apos;re all set to join us on <strong className="text-[#c0211f]">19th Feb</strong> offline!
+                            </p>
+
+                            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+                                <p className="text-amber-200 text-sm leading-relaxed text-center">
+                                    <span className="font-semibold text-white">Deadline for final confirmation:</span>
+                                    <br />
+                                    <span className="text-lg font-bold text-amber-300">17th Feb, 11:11 PM</span>
+                                    <br />
+                                    <span className="text-amber-200/90 text-xs mt-1 inline-block">(Yes, 11:11 — make a wish and hit submit! ✨)</span>
+                                    <br />
+                                    <span className="text-amber-200/90 text-xs mt-2 block">If you miss this, unfortunately you won&apos;t be able to join us offline.</span>
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={dismissWelcomeModal}
+                                className="w-full py-4 rounded-xl font-bold text-white bg-[#c0211f] hover:bg-[#a01b1a] transition-all shadow-lg hover:shadow-[#c0211f]/20"
+                            >
+                                Let&apos;s go
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Left Side - Fixed Title and Steps */}
             <div className="w-full lg:w-1/2 flex flex-col justify-center mt-20 md:mt-0 px-28 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
@@ -376,7 +457,7 @@ export default function Home() {
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${currentStepInfo.number >= 3 ? 'bg-[#c0211f] text-white' : 'bg-gray-700 text-gray-400'}`}>
                                 3
                             </div>
-                            <span className="text-white text-2xl font-medium">Complete RSVP/ <br />Open Dashboard</span>
+                            <span className="text-white text-2xl font-medium">Final Confirmation/ <br />Open Dashboard</span>
                         </div>
                     </div>
                 </div>
@@ -542,9 +623,14 @@ export default function Home() {
                                                         <p className="text-sm text-gray-300">Team Leader: {team.leader_name}</p>
                                                         <p className="text-xs text-gray-400">{team.city} • {team.member_count} members</p>
                                                     </div>
-                                                    {team.rsvp_locked && (
+                                                    {(team.status === 'rsvp2_done' || team.status === 'checked_in') && (
                                                         <span className="px-3 py-1 bg-green-500/20 text-green-300 border border-green-500/30 rounded-full text-xs font-medium">
-                                                            RSVP Done
+                                                            Confirmed
+                                                        </span>
+                                                    )}
+                                                    {team.status === 'rsvp_done' && (
+                                                        <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-xs font-medium">
+                                                            Final Confirmation Pending
                                                         </span>
                                                     )}
                                                 </div>

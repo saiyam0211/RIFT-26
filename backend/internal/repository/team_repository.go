@@ -21,7 +21,7 @@ func NewTeamRepository(db *database.DB) *TeamRepository {
 	return &TeamRepository{db: db}
 }
 
-// SearchByName performs fuzzy search on team names (only RSVP completed teams for RSVP II)
+// SearchByName performs fuzzy search on team names (teams that completed RSVP I and/or Final Confirmation)
 func (r *TeamRepository) SearchByName(ctx context.Context, teamName string) ([]models.Team, error) {
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
@@ -29,7 +29,7 @@ func (r *TeamRepository) SearchByName(ctx context.Context, teamName string) ([]m
 		       dashboard_token, created_at, updated_at, member_count
 		FROM teams
 		WHERE LOWER(team_name) LIKE LOWER($1) 
-		  AND status = 'rsvp_done'
+		  AND status IN ('rsvp_done', 'rsvp2_done', 'checked_in')
 		ORDER BY team_name
 		LIMIT 10
 	`

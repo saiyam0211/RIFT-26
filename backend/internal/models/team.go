@@ -101,5 +101,5 @@ type TeamMemberUpdate struct {
 }
 
 type RSVP2SubmissionRequest struct {
-	SelectedMemberIDs []uuid.UUID `json:"selected_member_ids" binding:"required,min=1"`
+	SelectedMemberIDs []uuid.UUID `json:"selected_member_ids" binding:"required,min=2"`
 }

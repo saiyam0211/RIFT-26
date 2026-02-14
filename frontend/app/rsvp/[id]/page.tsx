@@ -6,7 +6,7 @@ import axios from 'axios'
 import { Team, TeamMember } from '@/types'
 import RIFTBackground from '@/components/RIFTBackground'
 import CustomLoader from '@/components/CustomLoader'
-import { ArrowLeft, Users, CheckCircle2, User } from 'lucide-react'
+import { ArrowLeft, Users, CheckCircle2, User, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '@/store/auth-store'
 
 export default function RSVP2Page() {
@@ -20,6 +20,8 @@ export default function RSVP2Page() {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
+    const [showInfoModal, setShowInfoModal] = useState(true)
+    const [agreedToTerms, setAgreedToTerms] = useState(false)
 
     useEffect(() => {
         // Wait a bit for auth to be available
@@ -130,8 +132,8 @@ export default function RSVP2Page() {
     }
 
     const handleSubmit = async () => {
-        if (selectedMembers.size === 0) {
-            setError('Please select at least one team member')
+        if (selectedMembers.size < 2) {
+            setError('At least 2 team members must be selected to participate.')
             return
         }
 
@@ -230,6 +232,56 @@ export default function RSVP2Page() {
         <div className="min-h-screen relative">
             <RIFTBackground />
             
+            {/* Info modal - shown first when landing on step 3 */}
+            {showInfoModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="bg-gray-900 border border-white/20 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <AlertCircle className="text-amber-400 shrink-0" size={28} />
+                                <h2 className="text-xl font-bold text-white">Please read before continuing</h2>
+                            </div>
+                            <ul className="space-y-3 text-gray-300 text-sm mb-6">
+                                <li className="flex gap-2">
+                                    <span className="text-amber-400 mt-0.5">•</span>
+                                    <span><strong className="text-white">Team leader must be present</strong> on the hackathon day.</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="text-amber-400 mt-0.5">•</span>
+                                    <span>If any team member is <strong className="text-white">not coming</strong>, leave them <strong className="text-white">unchecked</strong>. You can still participate in the hackathon.</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="text-amber-400 mt-0.5">•</span>
+                                    <span><strong className="text-white">At least 2 members</strong> must be selected in a team to proceed.</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="text-amber-400 mt-0.5">•</span>
+                                    <span>You <strong className="text-white">cannot change or edit member details</strong> now. If someone is not coming, simply do not check that member and you can still proceed. <strong className="text-amber-300">Do not contact us later to edit team members — it is not possible.</strong></span>
+                                </li>
+                            </ul>
+                            <label className="flex items-start gap-3 cursor-pointer group mb-6">
+                                <input
+                                    type="checkbox"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                    className="mt-1 w-5 h-5 rounded border-gray-500 bg-gray-800 text-[#c0211f] focus:ring-[#c0211f]"
+                                />
+                                <span className="text-gray-300 text-sm group-hover:text-white transition-colors">
+                                    I have read and understood the above. I will select only the members who are attending and will not request any member edits later.
+                                </span>
+                            </label>
+                            <button
+                                onClick={() => setShowInfoModal(false)}
+                                disabled={!agreedToTerms}
+                                className="w-full py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-[#c0211f] hover:bg-[#a01b1a] text-white disabled:hover:bg-[#c0211f]"
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="relative z-10 container mx-auto px-4 py-8">
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
@@ -283,10 +335,6 @@ export default function RSVP2Page() {
                             const isSelected = selectedMembers.has(member.id)
                             const isDisabled = isLeader // Leader is always required
                             
-                            if (isLeader) {
-                                console.log('Rendering leader:', member.name, 'isSelected:', isSelected, 'memberID:', member.id)
-                            }
-                            
                             return (
                                 <div
                                     key={member.id}
@@ -326,10 +374,10 @@ export default function RSVP2Page() {
                 </div>
 
                 {/* Submit Button */}
-                <div className="flex justify-center">
+                <div className="flex justify-center flex-col items-center">
                     <button
                         onClick={handleSubmit}
-                        disabled={submitting || selectedMembers.size === 0}
+                        disabled={submitting || selectedMembers.size < 2}
                         className="bg-[#c0211f] hover:bg-[#a01b1a] disabled:bg-gray-600 disabled:text-gray-400 text-white font-bold py-4 px-8 rounded-xl transition-all text-lg min-w-[200px]"
                     >
                         {submitting ? (
@@ -338,6 +386,9 @@ export default function RSVP2Page() {
                             `Confirm ${selectedMembers.size} Member${selectedMembers.size !== 1 ? 's' : ''}`
                         )}
                     </button>
+                    {selectedMembers.size > 0 && selectedMembers.size < 2 && (
+                        <p className="text-red-400 text-sm mt-2 text-center">At least 2 members are required.</p>
+                    )}
                 </div>
 
                 {error && (
