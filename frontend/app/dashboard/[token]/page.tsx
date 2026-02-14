@@ -168,8 +168,8 @@ export default function DashboardPage() {
     const getStatusBadge = () => {
         const statusConfig = {
             shortlisted: { color: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-200', text: 'Shortlisted' },
-            rsvp_done: { color: 'bg-blue-500/20 border-blue-500/50 text-blue-200', text: 'RSVP I Confirmed' },
-            rsvp2_done: { color: 'bg-purple-500/20 border-purple-500/50 text-purple-200', text: 'RSVP II Confirmed' },
+            rsvp_done: { color: 'bg-blue-500/20 border-blue-500/50 text-blue-200', text: 'RSVP Confirmed' },
+            rsvp2_done: { color: 'bg-purple-500/20 border-purple-500/50 text-purple-200', text: 'Confirmed' },
             checked_in: { color: 'bg-green-500/20 border-green-500/50 text-green-200', text: 'Checked In ✓' },
         }
         const config = statusConfig[team.status] || statusConfig.shortlisted

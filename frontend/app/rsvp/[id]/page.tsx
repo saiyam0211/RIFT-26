@@ -74,20 +74,29 @@ export default function RSVP2Page() {
             const teamData = response.data
             setTeam(teamData)
 
-            // Check if team is in correct state for RSVP II
+            // Check if team is in correct state for Final Confirmation
             if (teamData.status !== 'rsvp_done') {
-                setError('Team must complete RSVP I before RSVP II')
+                setError('Team must complete RSVP before Final Confirmation')
                 return
             }
 
             if (teamData.rsvp2_locked) {
-                // Team already completed RSVP II, redirect to dashboard
+                // Team already completed Final Confirmation, redirect to dashboard
                 router.push(`/dashboard/${teamData.dashboard_token}`)
                 return
             }
 
-            // Start with no members selected - user must choose who's attending
-            setSelectedMembers(new Set<string>())
+            // Start with team leader pre-selected (mandatory)
+            const leaderMember = teamData.members?.find((m: TeamMember) => m.role === 'leader')
+            const initialSelected = new Set<string>()
+            if (leaderMember) {
+                console.log('Auto-selecting team leader:', leaderMember.name, leaderMember.id)
+                initialSelected.add(leaderMember.id)
+            } else {
+                console.warn('No team leader found in members')
+            }
+            console.log('Initial selected members:', Array.from(initialSelected))
+            setSelectedMembers(initialSelected)
 
             setLoading(false)
         } catch (err: any) {
@@ -105,7 +114,12 @@ export default function RSVP2Page() {
         }
     }
 
-    const toggleMember = (memberId: string) => {
+    const toggleMember = (memberId: string, isLeader: boolean) => {
+        // Prevent unchecking the team leader
+        if (isLeader && selectedMembers.has(memberId)) {
+            return
+        }
+        
         const newSelected = new Set(selectedMembers)
         if (newSelected.has(memberId)) {
             newSelected.delete(memberId)
@@ -166,7 +180,7 @@ export default function RSVP2Page() {
                 router.push('/')
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to submit RSVP II')
+            setError(err.response?.data?.error || 'Failed to submit confirmation')
             setSubmitting(false)
         }
     }
@@ -226,7 +240,7 @@ export default function RSVP2Page() {
                         <ArrowLeft className="text-white" size={24} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-bold text-white">RSVP II</h1>
+                        <h1 className="text-3xl font-bold text-white">Final Confirmation</h1>
                         <p className="text-gray-400">Select attending team members</p>
                     </div>
                 </div>
@@ -246,9 +260,10 @@ export default function RSVP2Page() {
 
                 {/* Instructions */}
                 <div className="bg-blue-500/10 border border-blue-500/50 rounded-xl p-6 mb-8">
-                    <h3 className="text-blue-400 font-semibold mb-2">Instructions</h3>
+                    <h3 className="text-blue-400 font-semibold mb-2">Final Step</h3>
                     <p className="text-gray-300 text-sm">
-                        Please select which team members will be attending RIFT '26. 
+                        Please confirm which team members will be attending RIFT '26. 
+                        The team leader must attend and is automatically selected. 
                         Only selected members will be shown on your dashboard and will be eligible for check-in at the event.
                     </p>
                 </div>
@@ -263,40 +278,50 @@ export default function RSVP2Page() {
                     </div>
 
                     <div className="space-y-3">
-                        {team.members?.map((member) => (
-                            <div
-                                key={member.id}
-                                onClick={() => toggleMember(member.id)}
-                                className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                                    selectedMembers.has(member.id)
-                                        ? 'bg-[#c0211f]/20 border-[#c0211f]'
-                                        : 'bg-white/5 border-white/10 hover:border-white/20'
-                                }`}
-                            >
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                    selectedMembers.has(member.id)
-                                        ? 'bg-[#c0211f] border-[#c0211f]'
-                                        : 'border-gray-400'
-                                }`}>
-                                    {selectedMembers.has(member.id) && (
-                                        <CheckCircle2 size={16} className="text-white" />
-                                    )}
-                                </div>
-                                
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <User size={16} className="text-gray-400" />
-                                        <span className="text-white font-medium">{member.name}</span>
-                                        {member.role === 'leader' && (
-                                            <span className="text-xs bg-[#c0211f]/20 text-[#c0211f] px-2 py-1 rounded-full">
-                                                Leader
-                                            </span>
+                        {team.members?.map((member) => {
+                            const isLeader = member.role === 'leader'
+                            const isSelected = selectedMembers.has(member.id)
+                            const isDisabled = isLeader // Leader is always required
+                            
+                            if (isLeader) {
+                                console.log('Rendering leader:', member.name, 'isSelected:', isSelected, 'memberID:', member.id)
+                            }
+                            
+                            return (
+                                <div
+                                    key={member.id}
+                                    onClick={() => !isDisabled && toggleMember(member.id, isLeader)}
+                                    className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${
+                                        isSelected
+                                            ? 'bg-[#c0211f]/20 border-[#c0211f]'
+                                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                                    } ${isDisabled ? 'opacity-100' : 'cursor-pointer'}`}
+                                >
+                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                        isSelected
+                                            ? 'bg-[#c0211f] border-[#c0211f]'
+                                            : 'border-gray-400'
+                                    }`}>
+                                        {isSelected && (
+                                            <CheckCircle2 size={16} className="text-white" />
                                         )}
                                     </div>
-                                    <p className="text-gray-400 text-sm">{member.email}</p>
+                                    
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <User size={16} className="text-gray-400" />
+                                            <span className="text-white font-medium">{member.name}</span>
+                                            {isLeader && (
+                                                <span className="text-xs bg-[#c0211f]/20 text-[#c0211f] px-2 py-1 rounded-full">
+                                                    Leader (Required)
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-gray-400 text-sm">{member.email}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
 

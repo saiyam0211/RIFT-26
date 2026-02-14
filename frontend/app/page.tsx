@@ -183,14 +183,14 @@ export default function Home() {
                 console.log('FORCING RSVP II - Team has rsvp_done status (no OTP path)');
                 // Small delay to ensure localStorage is written
                 setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
-            } else if (team.status === 'rsvp2_done' && team.dashboard_token) {
+            } else if (teamData.status === 'rsvp2_done' && teamData.dashboard_token) {
                 // RSVP II completed, go to dashboard
                 console.log('Redirecting to dashboard - RSVP II completed');
-                router.push(`/dashboard/${team.dashboard_token}`);
-            } else if (team.rsvp_locked && team.dashboard_token) {
+                setTimeout(() => router.push(`/dashboard/${teamData.dashboard_token}`), 100);
+            } else if (teamData.rsvp_locked && teamData.dashboard_token) {
                 // Fallback: Old flow - RSVP locked, go to dashboard
                 console.log('Redirecting to dashboard - legacy RSVP locked fallback');
-                router.push(`/dashboard/${team.dashboard_token}`);
+                setTimeout(() => router.push(`/dashboard/${teamData.dashboard_token}`), 100);
             } else {
                 // Need to complete RSVP I first
                 const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
@@ -198,7 +198,7 @@ export default function Home() {
                 if (m === 'pin') {
                     setShowPinModal(true);
                 } else {
-                    router.push(`/rsvp/${team.id}`);
+                    setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
                 }
             }
         } catch (err: any) {
