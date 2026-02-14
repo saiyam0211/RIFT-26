@@ -155,17 +155,24 @@ export default function AdminDashboard() {
                     trend="+12% this week"
                 />
                 <StatCard
-                    title="RSVP Confirmed"
+                    title="RSVP I Confirmed"
                     value={stats?.rsvp_confirmed || 0}
                     icon={CheckCircle}
                     subtitle={`${rsvpPercentage}% completion`}
                     trend={`${stats?.total_teams ? stats.total_teams - stats.rsvp_confirmed : 0} pending`}
                 />
                 <StatCard
+                    title="RSVP II Confirmed"
+                    value={stats?.rsvp2_confirmed || 0}
+                    icon={Users}
+                    subtitle={`${Math.round(((stats?.rsvp2_confirmed || 0) / (stats?.rsvp_confirmed || 1)) * 100)}% of RSVP I`}
+                    trend={`${(stats?.rsvp_confirmed || 0) - (stats?.rsvp2_confirmed || 0)} pending`}
+                />
+                <StatCard
                     title="Checked In"
                     value={stats?.checked_in || 0}
                     icon={Ticket}
-                    subtitle={`${checkinPercentage}% of RSVP`}
+                    subtitle={`${checkinPercentage}% of RSVP II`}
                     trend="Live updates"
                 />
             </div>
@@ -204,13 +211,13 @@ export default function AdminDashboard() {
             )}
 
             {/* Progress Bars */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-red-600/10 rounded-lg">
                             <TrendingUp className="w-5 h-5 text-red-500" />
                         </div>
-                        <h3 className="text-lg font-semibold text-white">RSVP Progress</h3>
+                        <h3 className="text-lg font-semibold text-white">RSVP I Progress</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
@@ -226,6 +233,31 @@ export default function AdminDashboard() {
                         <div className="flex justify-between text-xs text-zinc-500 mt-2">
                             <span>{stats?.rsvp_confirmed || 0} Confirmed</span>
                             <span>{(stats?.total_teams || 0) - (stats?.rsvp_confirmed || 0)} Pending</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-blue-600/10 rounded-lg">
+                            <Users className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">RSVP II Progress</h3>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-zinc-400">Completed</span>
+                            <span className="font-semibold text-white">{Math.round(((stats?.rsvp2_confirmed || 0) / (stats?.rsvp_confirmed || 1)) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-zinc-800 rounded-full h-3">
+                            <div
+                                className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.round(((stats?.rsvp2_confirmed || 0) / (stats?.rsvp_confirmed || 1)) * 100)}%` }}
+                            ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-zinc-500 mt-2">
+                            <span>{stats?.rsvp2_confirmed || 0} Confirmed</span>
+                            <span>{(stats?.rsvp_confirmed || 0) - (stats?.rsvp2_confirmed || 0)} Pending</span>
                         </div>
                     </div>
                 </div>

@@ -2,11 +2,14 @@ export interface Team {
   id: string
   team_name: string
   city?: 'BLR' | 'PUNE' | 'NOIDA' | 'LKO'
-  status: 'shortlisted' | 'rsvp_done' | 'checked_in'
+  status: 'shortlisted' | 'rsvp_done' | 'rsvp2_done' | 'checked_in'
   problem_statement?: string
   qr_code_token?: string
   rsvp_locked: boolean
   rsvp_locked_at?: string
+  rsvp2_locked?: boolean
+  rsvp2_locked_at?: string
+  rsvp2_selected_members?: string[]
   checked_in_at?: string
   dashboard_token?: string
   created_at: string

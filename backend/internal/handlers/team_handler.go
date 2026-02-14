@@ -127,3 +127,38 @@ func (h *TeamHandler) GetDashboard(c *gin.Context) {
 		"qr_code":       qrCode,
 	})
 }
+
+// SubmitRSVP2 handles RSVP II submission (member selection)
+// PUT /api/v1/teams/:id/rsvp2
+func (h *TeamHandler) SubmitRSVP2(c *gin.Context) {
+	teamIDStr := c.Param("id")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid team ID"})
+		return
+	}
+
+	var req models.RSVP2SubmissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user email from context (set by auth middleware)
+	userEmail := c.GetString("user_email")
+	if userEmail == "" {
+		c.JSON(401, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	updatedTeam, err := h.teamService.SubmitRSVP2(c.Request.Context(), teamID, userEmail, req)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "RSVP II submitted successfully",
+		"team":    updatedTeam,
+	})
+}

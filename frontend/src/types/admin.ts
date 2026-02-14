@@ -13,6 +13,7 @@ export interface AdminLoginResponse {
 export interface TeamStats {
   total_teams: number;
   rsvp_confirmed: number;
+  rsvp2_confirmed: number;
   checked_in: number;
   city_distribution: Record<string, number>;
 }

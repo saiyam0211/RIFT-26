@@ -164,15 +164,35 @@ export default function Home() {
                 otp_code: '', // Empty OTP code when disabled
             });
 
-            setAuth(response.data.token, response.data.team);
-
-            // Store user email for leader identification
+            // Store auth data BEFORE redirect
+            const token = response.data.token;
+            const teamData = response.data.team;
+            
+            // Explicitly save to localStorage first
+            localStorage.setItem('auth_token', token);
             localStorage.setItem('user_email', email);
-
-            const team = response.data.team;
-            if (team.rsvp_locked && team.dashboard_token) {
+            
+            // Then update Zustand store
+            setAuth(token, teamData);
+            
+            console.log('Auth saved - Token:', token?.substring(0, 20) + '...', 'Team:', teamData.team_name);
+            
+            // FORCE RSVP II FLOW FOR RSVP_DONE TEAMS
+            // If team status is rsvp_done, always go to RSVP II regardless of other conditions
+            if (teamData.status === 'rsvp_done') {
+                console.log('FORCING RSVP II - Team has rsvp_done status (no OTP path)');
+                // Small delay to ensure localStorage is written
+                setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
+            } else if (team.status === 'rsvp2_done' && team.dashboard_token) {
+                // RSVP II completed, go to dashboard
+                console.log('Redirecting to dashboard - RSVP II completed');
+                router.push(`/dashboard/${team.dashboard_token}`);
+            } else if (team.rsvp_locked && team.dashboard_token) {
+                // Fallback: Old flow - RSVP locked, go to dashboard
+                console.log('Redirecting to dashboard - legacy RSVP locked fallback');
                 router.push(`/dashboard/${team.dashboard_token}`);
             } else {
+                // Need to complete RSVP I first
                 const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
                 const m = configRes.data.rsvp_open === 'pin' ? 'pin' : configRes.data.rsvp_open === true || configRes.data.rsvp_open === 'true' ? 'true' : 'false';
                 if (m === 'pin') {
@@ -202,21 +222,48 @@ export default function Home() {
                 otp_code: otpCode,
             });
 
-            setAuth(response.data.token, response.data.team);
-
-            // Store user email for leader identification
+            // Store auth data BEFORE redirect
+            const token = response.data.token;
+            const teamData = response.data.team;
+            
+            // Explicitly save to localStorage first
+            localStorage.setItem('auth_token', token);
             localStorage.setItem('user_email', email);
-
-            const team = response.data.team;
-            if (team.rsvp_locked && team.dashboard_token) {
-                router.push(`/dashboard/${team.dashboard_token}`);
+            
+            // Then update Zustand store
+            setAuth(token, teamData);
+            
+            console.log('Auth saved - Token:', token?.substring(0, 20) + '...', 'Team:', teamData.team_name);
+            console.log('DEBUG - Team data:', {
+                status: teamData.status,
+                rsvp_locked: teamData.rsvp_locked,
+                rsvp2_locked: teamData.rsvp2_locked,
+                dashboard_token: !!teamData.dashboard_token,
+                id: teamData.id
+            });
+            
+            // FORCE RSVP II FLOW FOR RSVP_DONE TEAMS
+            // If team status is rsvp_done, always go to RSVP II regardless of other conditions
+            if (teamData.status === 'rsvp_done') {
+                console.log('FORCING RSVP II - Team has rsvp_done status');
+                // Small delay to ensure localStorage is written
+                setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
+            } else if (teamData.status === 'rsvp2_done' && teamData.dashboard_token) {
+                // RSVP II completed, go to dashboard
+                console.log('Redirecting to dashboard - RSVP II completed');
+                setTimeout(() => router.push(`/dashboard/${teamData.dashboard_token}`), 100);
+            } else if (teamData.rsvp_locked && teamData.dashboard_token) {
+                // Fallback: Old flow - RSVP locked, go to dashboard
+                console.log('Redirecting to dashboard - legacy RSVP locked fallback');
+                setTimeout(() => router.push(`/dashboard/${teamData.dashboard_token}`), 100);
             } else {
+                // Need to complete RSVP I first
                 const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`);
                 const m = configRes.data.rsvp_open === 'pin' ? 'pin' : configRes.data.rsvp_open === true || configRes.data.rsvp_open === 'true' ? 'true' : 'false';
                 if (m === 'pin') {
                     setShowPinModal(true);
                 } else {
-                    router.push(`/rsvp/${team.id}`);
+                    setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
                 }
             }
         } catch (err: any) {

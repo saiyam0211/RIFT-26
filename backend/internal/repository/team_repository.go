@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"time"
 	"strings"
-
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/database"
@@ -21,14 +21,15 @@ func NewTeamRepository(db *database.DB) *TeamRepository {
 	return &TeamRepository{db: db}
 }
 
-// SearchByName performs fuzzy search on team names
+// SearchByName performs fuzzy search on team names (only RSVP completed teams for RSVP II)
 func (r *TeamRepository) SearchByName(ctx context.Context, teamName string) ([]models.Team, error) {
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
 		       rsvp_locked, rsvp_locked_at, checked_in_at, checked_in_by,
 		       dashboard_token, created_at, updated_at, member_count
 		FROM teams
-		WHERE LOWER(team_name) LIKE LOWER($1)
+		WHERE LOWER(team_name) LIKE LOWER($1) 
+		  AND status = 'rsvp_done'
 		ORDER BY team_name
 		LIMIT 10
 	`
@@ -65,16 +66,17 @@ func (r *TeamRepository) SearchByName(ctx context.Context, teamName string) ([]m
 func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Team, error) {
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
-		       rsvp_locked, rsvp_locked_at, checked_in_at, checked_in_by,
-		       dashboard_token, created_at, updated_at
+		       rsvp_locked, rsvp_locked_at, rsvp2_locked, rsvp2_locked_at, rsvp2_selected_members,
+		       checked_in_at, checked_in_by, dashboard_token, created_at, updated_at
 		FROM teams WHERE id = $1
 	`
 	var team models.Team
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&team.ID, &team.TeamName, &team.City, &team.Status,
 		&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
-		&team.RSVPLockedAt, &team.CheckedInAt, &team.CheckedInBy,
-		&team.DashboardToken, &team.CreatedAt, &team.UpdatedAt,
+		&team.RSVPLockedAt, &team.RSVP2Locked, &team.RSVP2LockedAt, &team.RSVP2SelectedMembers,
+		&team.CheckedInAt, &team.CheckedInBy, &team.DashboardToken, 
+		&team.CreatedAt, &team.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -97,16 +99,17 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Tea
 func (r *TeamRepository) GetByQRToken(ctx context.Context, token string) (*models.Team, error) {
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
-		       rsvp_locked, rsvp_locked_at, checked_in_at, checked_in_by,
-		       dashboard_token, created_at, updated_at
+		       rsvp_locked, rsvp_locked_at, rsvp2_locked, rsvp2_locked_at, rsvp2_selected_members,
+		       checked_in_at, checked_in_by, dashboard_token, created_at, updated_at
 		FROM teams WHERE qr_code_token = $1
 	`
 	var team models.Team
 	err := r.db.QueryRowContext(ctx, query, token).Scan(
 		&team.ID, &team.TeamName, &team.City, &team.Status,
 		&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
-		&team.RSVPLockedAt, &team.CheckedInAt, &team.CheckedInBy,
-		&team.DashboardToken, &team.CreatedAt, &team.UpdatedAt,
+		&team.RSVPLockedAt, &team.RSVP2Locked, &team.RSVP2LockedAt, &team.RSVP2SelectedMembers,
+		&team.CheckedInAt, &team.CheckedInBy, &team.DashboardToken, 
+		&team.CreatedAt, &team.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -128,16 +131,17 @@ func (r *TeamRepository) GetByQRToken(ctx context.Context, token string) (*model
 func (r *TeamRepository) GetByDashboardToken(ctx context.Context, token string) (*models.Team, error) {
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
-		       rsvp_locked, rsvp_locked_at, checked_in_at, checked_in_by,
-		       dashboard_token, created_at, updated_at
+		       rsvp_locked, rsvp_locked_at, rsvp2_locked, rsvp2_locked_at, rsvp2_selected_members,
+		       checked_in_at, checked_in_by, dashboard_token, created_at, updated_at
 		FROM teams WHERE dashboard_token = $1
 	`
 	var team models.Team
 	err := r.db.QueryRowContext(ctx, query, token).Scan(
 		&team.ID, &team.TeamName, &team.City, &team.Status,
 		&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
-		&team.RSVPLockedAt, &team.CheckedInAt, &team.CheckedInBy,
-		&team.DashboardToken, &team.CreatedAt, &team.UpdatedAt,
+		&team.RSVPLockedAt, &team.RSVP2Locked, &team.RSVP2LockedAt, &team.RSVP2SelectedMembers,
+		&team.CheckedInAt, &team.CheckedInBy, &team.DashboardToken, 
+		&team.CreatedAt, &team.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -146,11 +150,22 @@ func (r *TeamRepository) GetByDashboardToken(ctx context.Context, token string) 
 		return nil, fmt.Errorf("failed to get team by dashboard token: %w", err)
 	}
 
-	members, err := r.GetMembersByTeamID(ctx, team.ID)
-	if err != nil {
-		return nil, err
+	// Get members based on RSVP II status
+	if team.RSVP2Locked && len(team.RSVP2SelectedMembers) > 0 {
+		// Team completed RSVP II, show only selected members
+		members, err := r.GetSelectedMembersByTeamID(ctx, team.ID, team.RSVP2SelectedMembers)
+		if err != nil {
+			return nil, err
+		}
+		team.Members = members
+	} else {
+		// Show all members (RSVP II not completed yet)
+		members, err := r.GetMembersByTeamID(ctx, team.ID)
+		if err != nil {
+			return nil, err
+		}
+		team.Members = members
 	}
-	team.Members = members
 
 	return &team, nil
 }
@@ -165,7 +180,7 @@ func (r *TeamRepository) GetMembersByTeamID(ctx context.Context, teamID uuid.UUI
 		WHERE team_id = '%s'
 		ORDER BY role DESC, name ASC
 	`, teamID.String())
-	
+
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get team members: %w", err)
@@ -379,13 +394,21 @@ func (r *TeamRepository) GetCheckInStats(ctx context.Context) (map[string]interf
 	}
 	stats["total_teams"] = totalTeams
 
-	// RSVP confirmed
+	// RSVP confirmed (RSVP I)
 	var rsvpConfirmed int
 	err = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM teams WHERE rsvp_locked = true`).Scan(&rsvpConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get RSVP count: %w", err)
 	}
 	stats["rsvp_confirmed"] = rsvpConfirmed
+
+	// RSVP II confirmed
+	var rsvp2Confirmed int
+	err = r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM teams WHERE rsvp2_locked = true`).Scan(&rsvp2Confirmed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RSVP II count: %w", err)
+	}
+	stats["rsvp2_confirmed"] = rsvp2Confirmed
 
 	// Checked in
 	var checkedIn int
@@ -477,7 +500,7 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 	for i, team := range teams {
 		teamIDs[i] = fmt.Sprintf("'%s'", team.ID.String())
 	}
-	
+
 	membersQuery := fmt.Sprintf(`
 		SELECT id, team_id, name, email, phone, role, tshirt_size,
 		       individual_qr_token, created_at, updated_at
@@ -485,7 +508,7 @@ func (r *TeamRepository) GetAllWithFilters(ctx context.Context, status, city str
 		WHERE team_id IN (%s)
 		ORDER BY team_id, role DESC, name ASC
 	`, strings.Join(teamIDs, ","))
-	
+
 	memberRows, err := r.db.Query(membersQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query all team members: %w", err)
@@ -658,4 +681,84 @@ func (r *TeamRepository) CheckTeamExistsByNameAndLeader(ctx context.Context, tea
 		return nil, fmt.Errorf("failed to check team existence: %w", err)
 	}
 	return &team, nil
+}
+
+// GetSelectedMembersByTeamID retrieves only selected members based on RSVP II selection
+func (r *TeamRepository) GetSelectedMembersByTeamID(ctx context.Context, teamID uuid.UUID, selectedMembersJSON []byte) ([]models.TeamMember, error) {
+	// Parse selected member IDs from JSON
+	var selectedMemberIDs []uuid.UUID
+	if err := json.Unmarshal(selectedMembersJSON, &selectedMemberIDs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal selected members: %w", err)
+	}
+
+	if len(selectedMemberIDs) == 0 {
+		return []models.TeamMember{}, nil
+	}
+
+	// Build query with IN clause for selected member IDs
+	placeholders := make([]string, len(selectedMemberIDs))
+	args := make([]interface{}, len(selectedMemberIDs)+1)
+	args[0] = teamID
+	
+	for i, memberID := range selectedMemberIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+2)
+		args[i+1] = memberID
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, team_id, name, email, phone, role, tshirt_size,
+		       individual_qr_token, created_at, updated_at
+		FROM team_members 
+		WHERE team_id = $1 AND id IN (%s)
+		ORDER BY role DESC, name ASC
+	`, strings.Join(placeholders, ","))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get selected team members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []models.TeamMember
+	for rows.Next() {
+		var member models.TeamMember
+		err := rows.Scan(
+			&member.ID, &member.TeamID, &member.Name, &member.Email,
+			&member.Phone, &member.Role, &member.TShirtSize,
+			&member.IndividualQRToken, &member.CreatedAt, &member.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan team member: %w", err)
+		}
+		members = append(members, member)
+	}
+
+	return members, nil
+}
+
+// UpdateRSVP2 updates team with RSVP II data (selected members)
+func (r *TeamRepository) UpdateRSVP2(ctx context.Context, teamID uuid.UUID, selectedMemberIDs []uuid.UUID) error {
+	// Convert member IDs to JSON
+	selectedMembersJSON, err := json.Marshal(selectedMemberIDs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal selected members: %w", err)
+	}
+
+	now := time.Now()
+	query := `
+		UPDATE teams 
+		SET status = 'rsvp2_done',
+		    rsvp2_locked = true,
+		    rsvp2_locked_at = $2,
+		    rsvp2_selected_members = $3,
+		    updated_at = $2
+		WHERE id = $1
+	`
+
+	_, err = r.db.ExecContext(ctx, query, teamID, now, selectedMembersJSON)
+	if err != nil {
+		return fmt.Errorf("failed to update RSVP II: %w", err)
+	}
+
+	return nil
 }

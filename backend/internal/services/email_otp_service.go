@@ -164,10 +164,10 @@ func (s *EmailOTPService) VerifyOTP(ctx context.Context, teamID uuid.UUID, email
 		}
 	}
 
-	// Generate JWT token
+	// Generate JWT token with email
 	token, err := utils.GenerateJWT(
 		teamID,
-		"",
+		email,
 		models.UserRoleParticipant,
 		&teamID,
 		s.jwtSecret,
@@ -182,6 +182,10 @@ func (s *EmailOTPService) VerifyOTP(ctx context.Context, teamID uuid.UUID, email
 		Team:        *team,
 		PhoneNumber: email, // Using this field for email  for backward compatibility
 	}
+
+	// Debug log to check team data
+	log.Printf("[AUTH] Team data for %s: Status=%s, RSVP_Locked=%t, RSVP2_Locked=%t", 
+		team.TeamName, team.Status, team.RSVPLocked, team.RSVP2Locked)
 
 	return response, nil
 }

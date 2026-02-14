@@ -11,6 +11,8 @@ interface CityStats {
     totalParticipants: number;
     rsvpParticipants: number;
     rsvpCount: number;
+    rsvp2Participants: number;
+    rsvp2Count: number;
     checkedInCount: number;
     teamSizeBreakdown: { [key: number]: number };
 }
@@ -70,6 +72,8 @@ export default function TeamsPage() {
                     totalParticipants: 0,
                     rsvpParticipants: 0,
                     rsvpCount: 0,
+                    rsvp2Participants: 0,
+                    rsvp2Count: 0,
                     checkedInCount: 0,
                     teamSizeBreakdown: {}
                 });
@@ -81,7 +85,11 @@ export default function TeamsPage() {
             if (team.rsvp_locked) {
                 stats.rsvpCount++;
                 stats.rsvpParticipants += memberCount;
-                // Only add to team size breakdown if RSVP is done
+            }
+            if (team.status === 'rsvp2_done') {
+                stats.rsvp2Count++;
+                stats.rsvp2Participants += memberCount;
+                // Team size breakdown based on RSVP II selected members (actual attending members)
                 stats.teamSizeBreakdown[memberCount] = (stats.teamSizeBreakdown[memberCount] || 0) + 1;
             }
             if (team.checked_in) stats.checkedInCount++;
@@ -101,7 +109,8 @@ export default function TeamsPage() {
         const matchesCity = !filter.city || team.city === filter.city;
         
         const matchesRsvp = !filter.rsvpStatus || 
-            (filter.rsvpStatus === 'completed' && team.rsvp_locked) ||
+            (filter.rsvpStatus === 'rsvp1_completed' && team.rsvp_locked) ||
+            (filter.rsvpStatus === 'rsvp2_completed' && team.status === 'rsvp2_done') ||
             (filter.rsvpStatus === 'pending' && !team.rsvp_locked);
         
         const matchesSize = !filter.teamSize || 
@@ -269,7 +278,7 @@ export default function TeamsPage() {
             {viewMode === 'stats' ? (
                 <div className="space-y-6">
                     {/* Overall Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                         <div className="bg-zinc-900 border border-zinc-800 text-white rounded-lg p-6">
                             <div className="text-4xl font-bold">{teams.length}</div>
                             <div className="text-zinc-400 mt-2">Total Teams</div>
@@ -284,7 +293,13 @@ export default function TeamsPage() {
                             <div className="text-4xl font-bold">
                                 {teams.filter(t => t.rsvp_locked).length}
                             </div>
-                            <div className="text-red-100 mt-2">RSVP Completed</div>
+                            <div className="text-red-100 mt-2">RSVP I Completed</div>
+                        </div>
+                        <div className="bg-blue-600 text-white rounded-lg p-6">
+                            <div className="text-4xl font-bold">
+                                {teams.filter(t => t.status === 'rsvp2_done').length}
+                            </div>
+                            <div className="text-blue-100 mt-2">RSVP II Completed</div>
                         </div>
                         <div className="bg-zinc-900 border border-zinc-800 text-white rounded-lg p-6">
                             <div className="text-4xl font-bold">{uniqueCities.length}</div>
@@ -302,8 +317,10 @@ export default function TeamsPage() {
                                         <th className="px-6 py-3 text-left text-sm font-semibold">City</th>
                                         <th className="px-6 py-3 text-center text-sm font-semibold">Teams</th>
                                         <th className="px-6 py-3 text-center text-sm font-semibold">Total Participants</th>
-                                        <th className="px-6 py-3 text-center text-sm font-semibold">RSVP Done (Teams)</th>
-                                        <th className="px-6 py-3 text-center text-sm font-semibold">RSVP Done (Participants)</th>
+                                        <th className="px-6 py-3 text-center text-sm font-semibold">RSVP I Done (Teams)</th>
+                                        <th className="px-6 py-3 text-center text-sm font-semibold">RSVP I Done (Participants)</th>
+                                        <th className="px-6 py-3 text-center text-sm font-semibold">RSVP II Done (Teams)</th>
+                                        <th className="px-6 py-3 text-center text-sm font-semibold">RSVP II Done (Participants)</th>
                                         <th className="px-6 py-3 text-center text-sm font-semibold">Checked In</th>
                                         <th className="px-6 py-3 text-center text-sm font-semibold">Team Size Breakdown</th>
                                     </tr>
@@ -330,6 +347,16 @@ export default function TeamsPage() {
                                             <td className="px-6 py-4 text-center">
                                                 <span className="bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-semibold">
                                                     {stat.rsvpParticipants}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-full font-semibold">
+                                                    {stat.rsvp2Count}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-full font-semibold">
+                                                    {stat.rsvp2Participants}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
@@ -443,7 +470,8 @@ export default function TeamsPage() {
                                 className="px-4 py-2 bg-zinc-950 border border-zinc-800 text-white rounded-lg focus:ring-2 focus:ring-red-600"
                             >
                                 <option value="">RSVP Status</option>
-                                <option value="completed">Completed</option>
+                                <option value="rsvp1_completed">RSVP I Completed</option>
+                                <option value="rsvp2_completed">RSVP II Completed</option>
                                 <option value="pending">Pending</option>
                             </select>
 
@@ -522,7 +550,10 @@ export default function TeamsPage() {
                                                 Members
                                             </th>
                                             <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">
-                                                RSVP
+                                                RSVP I
+                                            </th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">
+                                                RSVP II
                                             </th>
                                             <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">
                                                 Checked In
@@ -575,6 +606,15 @@ export default function TeamsPage() {
                                                         <span className="text-red-500 text-xl">✓</span>
                                                     ) : (
                                                         <span className="text-zinc-600 text-xl">⏳</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {team.status === 'rsvp2_done' ? (
+                                                        <span className="text-blue-500 text-xl">✓</span>
+                                                    ) : team.status === 'rsvp_done' ? (
+                                                        <span className="text-zinc-600 text-xl">⏳</span>
+                                                    ) : (
+                                                        <span className="text-zinc-600 text-xl">—</span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-center">

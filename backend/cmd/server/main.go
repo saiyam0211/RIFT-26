@@ -122,6 +122,7 @@ func main() {
 			teams.GET("/search", teamHandler.SearchTeams)
 			teams.GET("/:id", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.GetTeam)
 			teams.PUT("/:id/rsvp", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP)
+			teams.PUT("/:id/rsvp2", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP2)
 			// Team announcements (filtered by team) - must come after specific routes
 			teams.GET("/:id/announcements", announcementHandler.GetTeamAnnouncements)
 		}

@@ -11,6 +11,7 @@ type TeamStatus string
 const (
 	StatusShortlisted TeamStatus = "shortlisted"
 	StatusRSVPDone    TeamStatus = "rsvp_done"
+	StatusRSVP2Done   TeamStatus = "rsvp2_done"
 	StatusCheckedIn   TeamStatus = "checked_in"
 )
 
@@ -37,13 +38,16 @@ type Team struct {
 	Status           TeamStatus   `json:"status" db:"status"`
 	ProblemStatement *string      `json:"problem_statement" db:"problem_statement"`
 	QRCodeToken      *string      `json:"qr_code_token" db:"qr_code_token"`
-	RSVPLocked       bool         `json:"rsvp_locked" db:"rsvp_locked"`
-	RSVPLockedAt     *time.Time   `json:"rsvp_locked_at" db:"rsvp_locked_at"`
-	CheckedInAt      *time.Time   `json:"checked_in_at" db:"checked_in_at"`
-	CheckedInBy      *uuid.UUID   `json:"checked_in_by" db:"checked_in_by"`
-	DashboardToken   *string      `json:"dashboard_token" db:"dashboard_token"`
-	MemberCount      int          `json:"member_count" db:"member_count"`
-	EditAllowedUntil *time.Time   `json:"edit_allowed_until,omitempty" db:"edit_allowed_until"`
+	RSVPLocked          bool         `json:"rsvp_locked" db:"rsvp_locked"`
+	RSVPLockedAt        *time.Time   `json:"rsvp_locked_at" db:"rsvp_locked_at"`
+	RSVP2Locked         bool         `json:"rsvp2_locked" db:"rsvp2_locked"`
+	RSVP2LockedAt       *time.Time   `json:"rsvp2_locked_at" db:"rsvp2_locked_at"`
+	RSVP2SelectedMembers []byte      `json:"rsvp2_selected_members" db:"rsvp2_selected_members"`
+	CheckedInAt         *time.Time   `json:"checked_in_at" db:"checked_in_at"`
+	CheckedInBy         *uuid.UUID   `json:"checked_in_by" db:"checked_in_by"`
+	DashboardToken      *string      `json:"dashboard_token" db:"dashboard_token"`
+	MemberCount         int          `json:"member_count" db:"member_count"`
+	EditAllowedUntil    *time.Time   `json:"edit_allowed_until,omitempty" db:"edit_allowed_until"`
 	CreatedAt        time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time    `json:"updated_at" db:"updated_at"`
 	Members          []TeamMember `json:"members,omitempty"`
@@ -94,4 +98,8 @@ type TeamMemberUpdate struct {
 	Email      string    `json:"email" binding:"required,email"`
 	Phone      string    `json:"phone" binding:"required,len=10"`
 	TShirtSize *string   `json:"tshirt_size"`
+}
+
+type RSVP2SubmissionRequest struct {
+	SelectedMemberIDs []uuid.UUID `json:"selected_member_ids" binding:"required,min=1"`
 }

@@ -168,7 +168,8 @@ export default function DashboardPage() {
     const getStatusBadge = () => {
         const statusConfig = {
             shortlisted: { color: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-200', text: 'Shortlisted' },
-            rsvp_done: { color: 'bg-blue-500/20 border-blue-500/50 text-blue-200', text: 'RSVP Confirmed' },
+            rsvp_done: { color: 'bg-blue-500/20 border-blue-500/50 text-blue-200', text: 'RSVP I Confirmed' },
+            rsvp2_done: { color: 'bg-purple-500/20 border-purple-500/50 text-purple-200', text: 'RSVP II Confirmed' },
             checked_in: { color: 'bg-green-500/20 border-green-500/50 text-green-200', text: 'Checked In ✓' },
         }
         const config = statusConfig[team.status] || statusConfig.shortlisted
@@ -359,7 +360,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* QR Code - Clickable */}
-                    {qrCodeData && team.status === 'rsvp_done' && (
+                    {qrCodeData && (team.status === 'rsvp_done' || team.status === 'rsvp2_done' || team.status === 'checked_in') && (
                         <div
                             onClick={() => setShowQRModal(true)}
                             className="bg-white/5 border border-white/10 p-5 mx-auto rounded-xl w-56 justify-center items-center cursor-pointer hover:bg-white/10 transition group"
@@ -368,8 +369,8 @@ export default function DashboardPage() {
                             <div className="bg-white p-3 rounded-lg inline-block">
                                 <QRCode value={qrCodeData} size={160} level="H" />
                             </div>
-                            <p className="text-gray-500 text-xs mt-3 leading-relaxed group-hover:text-gray-400 transition">
-                                Click to enlarge • Present at {getCityName(team.city)} venue
+                            <p className="text-gray-500 text-xs mt-3 text-center leading-relaxed group-hover:text-gray-400 transition">
+                                Click to enlarge
                             </p>
                         </div>
                     )}

@@ -87,6 +87,69 @@ func (s *TeamService) GetTeamByID(ctx context.Context, teamID uuid.UUID) (*model
 	return team, nil
 }
 
+// SubmitRSVP2 handles RSVP II submission (member selection)
+func (s *TeamService) SubmitRSVP2(ctx context.Context, teamID uuid.UUID, userEmail string, req models.RSVP2SubmissionRequest) (*models.Team, error) {
+	// Get team and verify it exists and is in correct state
+	team, err := s.teamRepo.GetByID(ctx, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("team not found: %w", err)
+	}
+
+	// Verify team has completed RSVP I
+	if team.Status != models.StatusRSVPDone {
+		return nil, fmt.Errorf("team must complete RSVP I before RSVP II")
+	}
+
+	// Verify RSVP II not already locked
+	if team.RSVP2Locked {
+		return nil, fmt.Errorf("RSVP II already completed for this team")
+	}
+
+	// Get team members to validate selection
+	members, err := s.teamRepo.GetMembersByTeamID(ctx, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get team members: %w", err)
+	}
+
+	// Verify user is team leader
+	var isLeader bool
+	for _, member := range members {
+		if member.Email == userEmail && member.Role == models.RoleLeader {
+			isLeader = true
+			break
+		}
+	}
+	if !isLeader {
+		return nil, fmt.Errorf("only team leader can submit RSVP II")
+	}
+
+	// Validate selected member IDs exist in team
+	memberMap := make(map[uuid.UUID]bool)
+	for _, member := range members {
+		memberMap[member.ID] = true
+	}
+
+	for _, selectedID := range req.SelectedMemberIDs {
+		if !memberMap[selectedID] {
+			return nil, fmt.Errorf("invalid member ID: %s", selectedID)
+		}
+	}
+
+	// Update team with RSVP II data
+	err = s.teamRepo.UpdateRSVP2(ctx, teamID, req.SelectedMemberIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update RSVP II: %w", err)
+	}
+
+	// Get updated team
+	updatedTeam, err := s.teamRepo.GetByID(ctx, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get updated team: %w", err)
+	}
+
+	return updatedTeam, nil
+}
+
 // SubmitRSVP processes RSVP submission and locks the team
 func (s *TeamService) SubmitRSVP(ctx context.Context, teamID uuid.UUID, city models.City, memberUpdates []models.TeamMemberUpdate) error {
 	// Get existing team

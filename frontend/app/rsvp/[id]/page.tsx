@@ -1,194 +1,201 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { useAuthStore } from '@/store/auth-store'
-import apiClient from '@/lib/api-client'
-import { Team, RSVPSubmission } from '@/types'
+import { useParams, useRouter } from 'next/navigation'
+import axios from 'axios'
+import { Team, TeamMember } from '@/types'
 import RIFTBackground from '@/components/RIFTBackground'
 import CustomLoader from '@/components/CustomLoader'
+import { ArrowLeft, Users, CheckCircle2, User } from 'lucide-react'
+import { useAuthStore } from '@/store/auth-store'
 
-const CITIES = [
-    { value: 'BLR' as const, label: 'Bangalore' },
-    { value: 'PUNE' as const, label: 'Pune' },
-    { value: 'NOIDA' as const, label: 'Noida' },
-    { value: 'LKO' as const, label: 'Lucknow' },
-]
-
-type Step = 'edit_question' | 'edit_members' | 'city_question' | 'city_select' | 'review'
-
-export default function RSVPPage() {
-    const router = useRouter()
+export default function RSVP2Page() {
     const params = useParams()
+    const router = useRouter()
     const teamId = params.id as string
-    const { team: authTeam, isAuthenticated } = useAuthStore()
+    const { token: authToken } = useAuthStore()
 
-    const [step, setStep] = useState<Step>('edit_question')
     const [team, setTeam] = useState<Team | null>(null)
-    const [city, setCity] = useState<'BLR' | 'PUNE' | 'NOIDA' | 'LKO'>('BLR')
-    const [members, setMembers] = useState<any[]>([])
+    const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
-    const [cityChangeEnabled, setCityChangeEnabled] = useState(false)
 
     useEffect(() => {
-        const fetchConfig = async () => {
-            try {
-                const response = await apiClient.get('/config')
-                setCityChangeEnabled(response.data.city_change_enabled || false)
+        // Wait a bit for auth to be available
+        const timer = setTimeout(() => {
+            fetchTeamDetails()
+        }, 100)
+        return () => clearTimeout(timer)
+    }, [teamId, authToken])
 
-                // Check RSVP mode: only redirect when fully closed ("false"), not when "pin"
-                const rsvpMode = response.data.rsvp_open
-                const isClosed = rsvpMode === false || rsvpMode === 'false'
-
-                if (isClosed && authTeam && !authTeam.rsvp_locked) {
-                    router.push('/')
-                    return
+    const fetchTeamDetails = async () => {
+        try {
+            // Try multiple sources for the token
+            let token = authToken || localStorage.getItem('auth_token')
+            
+            // If still not found, try to extract from Zustand persist storage
+            if (!token) {
+                const authStorage = localStorage.getItem('auth-storage')
+                if (authStorage) {
+                    try {
+                        const parsed = JSON.parse(authStorage)
+                        token = parsed?.state?.token
+                    } catch (e) {
+                        console.error('Failed to parse auth-storage:', e)
+                    }
                 }
-            } catch (error) {
-                console.error('Failed to fetch config:', error)
-                setCityChangeEnabled(false)
             }
-        }
-
-        fetchConfig()
-
-        if (!isAuthenticated) {
-            router.push('/')
-            return
-        }
-
-        if (authTeam?.id !== teamId) {
-            setError('Not authorized for this team')
-            return
-        }
-
-        if (authTeam.rsvp_locked) {
-            router.push(`/dashboard/${authTeam.dashboard_token}`)
-            return
-        }
-
-        setTeam(authTeam)
-
-        // Set city to the team's city if it exists, otherwise default to BLR
-        if (authTeam.city) {
-            const teamCity = authTeam.city.toUpperCase() as 'BLR' | 'PUNE' | 'NOIDA' | 'LKO'
-            if (['BLR', 'PUNE', 'NOIDA', 'LKO'].includes(teamCity)) {
-                setCity(teamCity)
+            
+            console.log('=== RSVP2 Auth Debug ===')
+            console.log('authToken from store:', authToken ? authToken.substring(0, 30) + '...' : 'null')
+            console.log('localStorage auth_token:', localStorage.getItem('auth_token') ? 'exists' : 'missing')
+            console.log('localStorage auth-storage:', localStorage.getItem('auth-storage') ? 'exists' : 'missing')
+            console.log('Final token to use:', token ? token.substring(0, 30) + '...' : 'MISSING!')
+            console.log('========================')
+            
+            if (!token) {
+                console.error('❌ No auth token found anywhere, redirecting to home')
+                setError('Authentication required. Please login again.')
+                setTimeout(() => router.push('/'), 2000)
+                return
             }
+
+            console.log('Fetching team with ID:', teamId)
+            console.log('Using token:', token?.substring(0, 20) + '...')
+            
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/teams/${teamId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            
+            console.log('Team data received:', response.data)
+            
+            // Backend returns team directly, not wrapped in { team: ... }
+            const teamData = response.data
+            setTeam(teamData)
+
+            // Check if team is in correct state for RSVP II
+            if (teamData.status !== 'rsvp_done') {
+                setError('Team must complete RSVP I before RSVP II')
+                return
+            }
+
+            if (teamData.rsvp2_locked) {
+                // Team already completed RSVP II, redirect to dashboard
+                router.push(`/dashboard/${teamData.dashboard_token}`)
+                return
+            }
+
+            // Start with no members selected - user must choose who's attending
+            setSelectedMembers(new Set<string>())
+
+            setLoading(false)
+        } catch (err: any) {
+            console.error('Error fetching team details:', err)
+            console.error('Error response:', err.response?.data)
+            console.error('Error status:', err.response?.status)
+            
+            if (err.response?.status === 401) {
+                setError('Authentication failed. Please login again.')
+                setTimeout(() => router.push('/'), 2000)
+            } else {
+                setError(err.response?.data?.error || 'Failed to load team details')
+            }
+            setLoading(false)
         }
-
-        const sortedMembers = authTeam.members?.map((m) => ({
-            id: m.id,
-            name: m.name || '',
-            email: m.email || '',
-            phone: m.phone || '',
-            role: m.role || 'member',
-        })).sort((a, b) => {
-            if (a.role === 'leader') return -1
-            if (b.role === 'leader') return 1
-            return 0
-        }) || []
-        setMembers(sortedMembers)
-        setLoading(false)
-    }, [teamId, authTeam, isAuthenticated, router])
-
-    const getStepInfo = () => {
-        // All steps in RSVP are on step 3 (Complete RSVP)
-        return { number: 3 }
     }
 
-    const addMember = () => {
-        if (members.length >= 4) {
-            setError('Maximum 4 members allowed')
-            return
+    const toggleMember = (memberId: string) => {
+        const newSelected = new Set(selectedMembers)
+        if (newSelected.has(memberId)) {
+            newSelected.delete(memberId)
+        } else {
+            newSelected.add(memberId)
         }
-        // Generate a valid UUID v4 for new member
-        const newUUID = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-        setMembers([
-            ...members,
-            { id: newUUID, name: '', email: '', phone: '', role: 'member' },
-        ])
-        setError('')
-    }
-
-    const removeMember = (index: number) => {
-        // Cannot remove team leader (index 0)
-        if (index === 0) {
-            setError('Cannot remove team leader')
-            return
-        }
-        // Must have at least 2 members
-        if (members.length <= 2) {
-            setError('Team must have at least 2 members')
-            return
-        }
-        setMembers(members.filter((_, i) => i !== index))
-        setError('')
-    }
-
-    const handleMemberChange = (index: number, field: string, value: string) => {
-        const updated = [...members]
-        updated[index] = { ...updated[index], [field]: value }
-        setMembers(updated)
+        setSelectedMembers(newSelected)
     }
 
     const handleSubmit = async () => {
-        setError('')
-
-        // Validation
-        for (const member of members) {
-            if (!member.name || !member.email || !member.phone) {
-                setError('Please fill all member details')
-                return
-            }
-            if (member.phone.length !== 10) {
-                setError(`Invalid phone number for ${member.name}`)
-                return
-            }
-            if (!member.email.includes('@')) {
-                setError(`Invalid email for ${member.name}`)
-                return
-            }
+        if (selectedMembers.size === 0) {
+            setError('Please select at least one team member')
+            return
         }
 
         setSubmitting(true)
+        setError('')
 
         try {
-            const payload: RSVPSubmission = {
-                city,
-                members: members.map((m) => ({
-                    id: m.id,
-                    name: m.name,
-                    email: m.email,
-                    phone: m.phone,
-                })),
+            // Try multiple sources for the token
+            let token = authToken || localStorage.getItem('auth_token')
+            
+            // If still not found, try to extract from Zustand persist storage
+            if (!token) {
+                const authStorage = localStorage.getItem('auth-storage')
+                if (authStorage) {
+                    try {
+                        const parsed = JSON.parse(authStorage)
+                        token = parsed?.state?.token
+                    } catch (e) {
+                        console.error('Failed to parse auth-storage:', e)
+                    }
+                }
             }
+            
+            console.log('Submit - Token:', token ? 'exists' : 'MISSING')
+            
+            if (!token) {
+                setError('Authentication required. Please login again.')
+                setSubmitting(false)
+                return
+            }
+            
+            const response = await axios.put(
+                `${process.env.NEXT_PUBLIC_API_URL}/teams/${teamId}/rsvp2`,
+                {
+                    selected_member_ids: Array.from(selectedMembers)
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            )
 
-            await apiClient.put(`/teams/${teamId}/rsvp`, payload)
-
-            const response = await apiClient.get(`/teams/${teamId}`)
-            if (response.data.dashboard_token) {
-                router.push(`/dashboard/${response.data.dashboard_token}`)
+            // Redirect to dashboard
+            if (response.data.team?.dashboard_token) {
+                router.push(`/dashboard/${response.data.team.dashboard_token}`)
+            } else {
+                router.push('/')
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to submit RSVP')
-            console.error('RSVP Error:', err)
-        } finally {
+            setError(err.response?.data?.error || 'Failed to submit RSVP II')
             setSubmitting(false)
         }
     }
 
     if (loading) {
         return (
-            <div className="min-h-screen flex relative overflow-hidden">
+            <div className="min-h-screen flex items-center justify-center relative">
                 <RIFTBackground />
-                <div className="flex items-center justify-center w-full">
+                <div className="text-center z-10">
                     <CustomLoader />
+                </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen flex items-center justify-center relative">
+                <RIFTBackground />
+                <div className="text-center z-10 max-w-md mx-auto px-4">
+                    <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-6">
+                        <p className="text-red-400 mb-4">{error}</p>
+                        <button
+                            onClick={() => router.push('/')}
+                            className="bg-[#c0211f] hover:bg-[#a01b1a] text-white px-6 py-2 rounded-lg transition-colors"
+                        >
+                            Go Back
+                        </button>
+                    </div>
                 </div>
             </div>
         )
@@ -196,403 +203,123 @@ export default function RSVPPage() {
 
     if (!team) {
         return (
-            <div className="min-h-screen flex relative overflow-hidden">
+            <div className="min-h-screen flex items-center justify-center relative">
                 <RIFTBackground />
-                <div className="flex items-center justify-center w-full">
-                    <div className="text-center">
-                        <p className="text-red-400">{error || 'Team not found'}</p>
-                    </div>
+                <div className="text-center z-10">
+                    <p className="text-white">Team not found</p>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
+        <div className="min-h-screen relative">
             <RIFTBackground />
-
-            {/* Left Side - Fixed Title and Steps */}
-            <div className="w-full lg:w-1/2 flex flex-col justify-center md:mt-0  mt-20 px-28 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
-                <div className="space-y-8 lg:space-y-12">
-                    {/* Title */}
-                    <div className="text-center md:text-left">
-                        <h1 className="text-4xl sm:text-6xl lg:text-8xl font-tan font-bold text-[#c0211f] mb-2 lg:mb-4">
-                            RIFT '26
-                        </h1>
-                    </div>
-
-                    {/* Steps - Horizontal on Mobile, Vertical on Desktop */}
-                    {/* Mobile: Horizontal Stepper */}
-                    <div className="lg:hidden flex justify-center">
-                        <div className="flex items-center justify-center gap-12 relative w-full">
-                            {/* Step 1 */}
-                            <div className="flex flex-col items-center z-10">
-                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg bg-[#c0211f] text-white">
-                                    1
-                                </div>
-                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Search Team</span>
-                            </div>
-
-
-                            {/* Step 2 */}
-                            <div className="flex flex-col items-center z-10">
-                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg bg-[#c0211f] text-white">
-                                    2
-                                </div>
-                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap">Verify Details</span>
-                            </div>
-
-                            {/* Step 3 */}
-                            <div className="flex flex-col items-center z-10">
-                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg bg-[#c0211f] text-white scale-110">
-                                    3
-                                </div>
-                                <span className="text-white text-xs mt-2 text-center whitespace-nowrap font-semibold">Complete RSVP</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Desktop: Vertical Steps */}
-                    <div className="hidden lg:block space-y-6">
-                        <div className="flex items-center gap-4 transition-all duration-300 opacity-50">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
-                                1
-                            </div>
-                            <span className="text-white text-2xl font-medium">Search Team</span>
-                        </div>
-
-                        <div className="flex items-center gap-4 transition-all duration-300 opacity-50">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
-                                2
-                            </div>
-                            <span className="text-white text-2xl font-medium">Verify Details</span>
-                        </div>
-
-                        <div className="flex items-center gap-4 transition-all duration-300 opacity-100 scale-105">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-[#c0211f] text-white">
-                                3
-                            </div>
-                            <span className="text-white text-2xl font-medium">Complete RSVP/ <br />Open Dashboard</span>
-                        </div>
+            
+            <div className="relative z-10 container mx-auto px-4 py-8">
+                {/* Header */}
+                <div className="flex items-center gap-4 mb-8">
+                    <button
+                        onClick={() => router.push('/')}
+                        className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="text-white" size={24} />
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">RSVP II</h1>
+                        <p className="text-gray-400">Select attending team members</p>
                     </div>
                 </div>
-            </div>
 
-            {/* Right Side - RSVP Content */}
-            <div className="w-full lg:w-1/2 lg:ml-auto flex items-center justify-center min-h-screen py-8 -mt-80 md:mt-0 lg:py-12">
-                <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
-
-                    {/* Step 1: Edit Members Question */}
-                    {step === 'edit_question' && (
-                        <>
-                            <div className="text-center space-y-6">
-                                <h2 className="text-white text-3xl font-semibold">
-                                    Do you want to edit team members?
-                                </h2>
-                                <p className="text-gray-400">
-                                    Current members: {members.length} (2-4 members allowed)
-                                </p>
-                                <p className="text-gray-500 text-sm">
-                                    You can add new members, remove members, or update contact details
-                                </p>
-
-                                <div className="grid grid-cols-2 gap-4 mt-8">
-                                    <button
-                                        onClick={() => setStep('edit_members')}
-                                        className="py-4 px-6 cursor-pointer bg-[#c0211f] text-white rounded-lg font-semibold text-lg hover:bg-[#a01a17] transition-all"
-                                    >
-                                        Yes, Edit Members
-                                    </button>
-                                    <button
-                                        onClick={() => setStep('city_question')}
-                                        className="py-4 cursor-pointer px-6 bg-white/10 text-gray-300 rounded-lg font-semibold text-lg hover:bg-white/20 transition-all"
-                                    >
-                                        No, Keep Current
-                                    </button>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {/* Step 2: Edit Members Form */}
-                    {step === 'edit_members' && (
-                        <div className="mt-72 md:mt-0 space-y-6">
-                            <button
-                                onClick={() => {
-                                    setError('')
-                                    setStep('edit_question')
-                                }}
-                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
-                            >
-                                ← Back
-                            </button>
-
-                            <h2 className="text-white text-2xl font-semibold">Edit Team Members</h2>
-
-                            <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-lg">
-                                <p className="text-blue-200 text-sm">
-                                    ℹ️ Team leader details (name, email, phone) are locked and cannot be changed. You can add/remove other members and update their contact details.
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                {members.map((member, index) => (
-                                    <div key={member.id} className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-white font-medium">
-                                                {index === 0 ? 'Team Leader' : `Member ${index + 1}`}
-                                            </h3>
-                                            {index > 0 && (
-                                                <button
-                                                    onClick={() => removeMember(index)}
-                                                    className="text-red-400 cursor-pointer hover:text-red-300 text-sm flex items-center gap-1"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        <div className="input-container">
-                                            <input
-                                                type="text"
-                                                value={member.name}
-                                                onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
-                                                placeholder="Full Name"
-                                                disabled={index === 0}
-                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
-                                            />
-                                        </div>
-
-                                        <div className="input-container">
-                                            <input
-                                                type="email"
-                                                value={member.email}
-                                                onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
-                                                placeholder="Email Address"
-                                                disabled={index === 0}
-                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
-                                            />
-                                        </div>
-
-                                        <div className="input-container">
-                                            <input
-                                                type="tel"
-                                                inputMode="numeric"
-                                                value={member.phone}
-                                                onChange={(e) => handleMemberChange(index, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                                placeholder="Phone Number (10 digits)"
-                                                maxLength={10}
-                                                disabled={index === 0}
-                                                className={index === 0 ? 'cursor-not-allowed opacity-60' : ''}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {members.length < 4 && (
-                                    <button
-                                        onClick={addMember}
-                                        className="w-full cursor-pointer py-3 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 transition font-medium flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        Add Member ({members.length}/4)
-                                    </button>
-                                )}
-                            </div>
-
-                            {error && (
-                                <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-                                    <p className="text-red-200 text-sm">{error}</p>
-                                </div>
-                            )}
-
-                            <button
-                                onClick={() => {
-                                    setError('')
-                                    // Validate all members have complete information
-                                    for (const member of members) {
-                                        if (!member.name || !member.email || !member.phone) {
-                                            setError('Please fill all member details before proceeding')
-                                            return
-                                        }
-                                        if (member.phone.length !== 10) {
-                                            setError(`Phone number must be exactly 10 digits for ${member.name}`)
-                                            return
-                                        }
-                                        if (!member.email.includes('@')) {
-                                            setError(`Invalid email format for ${member.name}`)
-                                            return
-                                        }
-                                    }
-                                    if (members.length < 2) {
-                                        setError('Team must have at least 2 members')
-                                        return
-                                    }
-                                    if (members.length > 4) {
-                                        setError('Team cannot have more than 4 members')
-                                        return
-                                    }
-                                    setStep('city_question')
-                                }}
-                                className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all"
-                            >
-                                Next
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step 3: City Change Question */}
-                    {step === 'city_question' && (
-                        <>
-                            <button
-                                onClick={() => setStep('edit_question')}
-                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
-                            >
-                                ← Back
-                            </button>
-
-                            <div className="space-y-6">
-                                <h2 className="text-white text-2xl font-semibold text-center">
-                                    Do you want to change the city?
-                                </h2>
-                                <p className="text-gray-400 text-center">
-                                    Currently selected: <span className="font-semibold text-white">{CITIES.find(c => c.value === city)?.label}</span>
-                                </p>
-
-                                <div className="grid grid-cols-2 gap-4 mt-8">
-                                    <button
-                                        onClick={() => setStep('city_select')}
-                                        className="py-4 px-6 cursor-pointer bg-[#c0211f] text-white rounded-lg font-semibold text-lg hover:bg-[#a01a17] transition-all"
-                                    >
-                                        Yes, Change City
-                                    </button>
-                                    <button
-                                        onClick={() => setStep('review')}
-                                        className="py-4 cursor-pointer px-6 bg-white/10 text-gray-300 rounded-lg font-semibold text-lg hover:bg-white/20 transition-all"
-                                    >
-                                        No, Keep Current
-                                    </button>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {/* Step 4: City Selection */}
-                    {step === 'city_select' && (
-                        <>
-                            <button
-                                onClick={() => setStep('city_question')}
-                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
-                            >
-                                ← Back
-                            </button>
-
-                            <div className="space-y-6">
-                                <h2 className="text-white text-2xl font-semibold text-center">
-                                    Select City Venue
-                                </h2>
-
-                                {!cityChangeEnabled && (
-                                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                                        <p className="text-yellow-200 text-sm text-center">
-                                            City selection is locked. Your team will participate in {CITIES.find(c => c.value === city)?.label}.
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    {CITIES.map((c) => (
-                                        <button
-                                            key={c.value}
-                                            type="button"
-                                            onClick={() => cityChangeEnabled && setCity(c.value)}
-                                            disabled={!cityChangeEnabled}
-                                            className={`py-4 px-4 rounded-lg font-semibold text-lg transition ${!cityChangeEnabled
-                                                ? 'cursor-not-allowed opacity-50'
-                                                : 'cursor-pointer'
-                                                } ${city === c.value
-                                                    ? 'bg-[#c0211f] text-white'
-                                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                                                }`}
-                                        >
-                                            {c.label}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <button
-                                    onClick={() => setStep('review')}
-                                    className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all"
-                                >
-                                    Continue to Review
-                                </button>
-                            </div>
-                        </>
-                    )}
-
-                    {/* Step 4: Review */}
-                    {step === 'review' && (
-                        <div className='mt-72 md:mt-0 space-y-6'>
-                            <button
-                                onClick={() => setStep('city_question')}
-                                className="text-sm text-gray-400 hover:text-white flex items-center gap-2"
-                            >
-                                ← Back
-                            </button>
-
-                            <h2 className="text-white text-2xl font-semibold">Review Your RSVP</h2>
-
-                            {error && (
-                                <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-                                    <p className="text-red-200 text-sm">{error}</p>
-                                </div>
-                            )}
-
-                            <div className="space-y-6">
-                                {/* City */}
-                                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                                    <h3 className="text-gray-400 text-sm mb-2">City</h3>
-                                    <p className="text-white font-semibold text-lg">{CITIES.find(c => c.value === city)?.label}</p>
-                                </div>
-
-                                {/* Team Members */}
-                                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                                    <h3 className="text-gray-400 text-sm mb-3">Team Members ({members.length})</h3>
-                                    <div className="space-y-3">
-                                        {members.map((member, index) => (
-                                            <div key={member.id} className="p-3 bg-white/5 rounded">
-                                                <p className="text-white font-medium">
-                                                    {member.name} {index === 0 && '(Leader)'}
-                                                </p>
-                                                <p className="text-gray-400 text-sm">{member.email}</p>
-                                                <p className="text-gray-400 text-sm">{member.phone}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-yellow-500/20 border border-yellow-500/50 p-4 rounded-lg">
-                                <p className="text-yellow-200 text-sm">
-                                    ⚠️ Once submitted, your RSVP will be locked and cannot be changed
-                                </p>
-                            </div>
-
-                            <button
-                                onClick={handleSubmit}
-                                disabled={submitting}
-                                className="w-full bg-[#c0211f] cursor-pointer text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#a01a17] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {submitting ? 'Submitting...' : 'Confirm RSVP & Lock'}
-                            </button>
-                        </div>
-                    )}
+                {/* Team Info */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-6 mb-8">
+                    <h2 className="text-2xl font-bold text-white mb-2">{team.team_name}</h2>
+                    <div className="flex items-center gap-4 text-gray-300">
+                        <span>City: {team.city || 'Not specified'}</span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                            <CheckCircle2 size={16} className="text-green-400" />
+                            RSVP I Completed
+                        </span>
+                    </div>
                 </div>
+
+                {/* Instructions */}
+                <div className="bg-blue-500/10 border border-blue-500/50 rounded-xl p-6 mb-8">
+                    <h3 className="text-blue-400 font-semibold mb-2">Instructions</h3>
+                    <p className="text-gray-300 text-sm">
+                        Please select which team members will be attending RIFT '26. 
+                        Only selected members will be shown on your dashboard and will be eligible for check-in at the event.
+                    </p>
+                </div>
+
+                {/* Member Selection */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-6 mb-8">
+                    <div className="flex items-center gap-2 mb-6">
+                        <Users className="text-[#c0211f]" size={24} />
+                        <h3 className="text-xl font-bold text-white">
+                            Select Attending Members ({selectedMembers.size}/{team.members?.length || 0})
+                        </h3>
+                    </div>
+
+                    <div className="space-y-3">
+                        {team.members?.map((member) => (
+                            <div
+                                key={member.id}
+                                onClick={() => toggleMember(member.id)}
+                                className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                    selectedMembers.has(member.id)
+                                        ? 'bg-[#c0211f]/20 border-[#c0211f]'
+                                        : 'bg-white/5 border-white/10 hover:border-white/20'
+                                }`}
+                            >
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                    selectedMembers.has(member.id)
+                                        ? 'bg-[#c0211f] border-[#c0211f]'
+                                        : 'border-gray-400'
+                                }`}>
+                                    {selectedMembers.has(member.id) && (
+                                        <CheckCircle2 size={16} className="text-white" />
+                                    )}
+                                </div>
+                                
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <User size={16} className="text-gray-400" />
+                                        <span className="text-white font-medium">{member.name}</span>
+                                        {member.role === 'leader' && (
+                                            <span className="text-xs bg-[#c0211f]/20 text-[#c0211f] px-2 py-1 rounded-full">
+                                                Leader
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-gray-400 text-sm">{member.email}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex justify-center">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting || selectedMembers.size === 0}
+                        className="bg-[#c0211f] hover:bg-[#a01b1a] disabled:bg-gray-600 disabled:text-gray-400 text-white font-bold py-4 px-8 rounded-xl transition-all text-lg min-w-[200px]"
+                    >
+                        {submitting ? (
+                            'Submitting...'
+                        ) : (
+                            `Confirm ${selectedMembers.size} Member${selectedMembers.size !== 1 ? 's' : ''}`
+                        )}
+                    </button>
+                </div>
+
+                {error && (
+                    <div className="mt-6 bg-red-500/10 border border-red-500/50 rounded-xl p-4">
+                        <p className="text-red-400 text-center">{error}</p>
+                    </div>
+                )}
             </div>
         </div>
     )
