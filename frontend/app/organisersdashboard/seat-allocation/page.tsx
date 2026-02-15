@@ -1250,10 +1250,10 @@ export default function SeatAllocationPage() {
                                                         return { row: r, col: c }
                                                     })
                                                     
-                                                    const minRow = Math.min(...groupPositions.map(p => p.row))
-                                                    const maxRow = Math.max(...groupPositions.map(p => p.row))
-                                                    const minCol = Math.min(...groupPositions.map(p => p.col))
-                                                    const maxCol = Math.max(...groupPositions.map(p => p.col))
+                                                    const minRow = Math.min(...groupPositions.map((p: { row: number; col: number }) => p.row))
+                                                    const maxRow = Math.max(...groupPositions.map((p: { row: number; col: number }) => p.row))
+                                                    const minCol = Math.min(...groupPositions.map((p: { row: number; col: number }) => p.col))
+                                                    const maxCol = Math.max(...groupPositions.map((p: { row: number; col: number }) => p.col))
                                                     
                                                     return (
                                                         <div
