@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // Block represents a physical block/building
@@ -26,6 +27,7 @@ type Room struct {
 	CurrentOccupancy int       `json:"current_occupancy" gorm:"default:0"`
 	DisplayOrder     int       `json:"display_order" gorm:"not null"`
 	IsActive         bool      `json:"is_active" gorm:"default:true"`
+	LayoutJSON       []byte    `json:"layout_json,omitempty" gorm:"type:jsonb"` // full canvas: { rows, cols, cells: {"r,c": type}, groups }
 	CreatedAt        time.Time `json:"created_at" gorm:"default:now()"`
 	UpdatedAt        time.Time `json:"updated_at" gorm:"default:now()"`
 
@@ -33,21 +35,55 @@ type Room struct {
 	Block *Block `json:"block,omitempty" gorm:"foreignKey:BlockID"`
 }
 
-// Seat represents an individual seat in a room
+// Seat represents an individual seat in a room.
+// When seat_group_id is set, this seat is part of a merged group (2/3/4 seats allocated together).
 type Seat struct {
-	ID                 uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	RoomID             uuid.UUID `json:"room_id" gorm:"type:uuid;not null"`
-	RowNumber          int       `json:"row_number" gorm:"not null"`
-	ColumnNumber       int       `json:"column_number" gorm:"not null"`
-	SeatLabel          string    `json:"seat_label" gorm:"type:varchar(10);not null"`
-	TeamSizePreference *int      `json:"team_size_preference" gorm:"default:null"`
-	IsAvailable        bool      `json:"is_available" gorm:"default:true"`
-	IsActive           bool      `json:"is_active" gorm:"default:true"`
-	CreatedAt          time.Time `json:"created_at" gorm:"default:now()"`
-	UpdatedAt          time.Time `json:"updated_at" gorm:"default:now()"`
+	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	RoomID             uuid.UUID  `json:"room_id" gorm:"type:uuid;not null"`
+	RowNumber          int        `json:"row_number" gorm:"not null"`
+	ColumnNumber       int        `json:"column_number" gorm:"not null"`
+	SeatLabel          string     `json:"seat_label" gorm:"type:varchar(20);not null"`
+	TeamSizePreference *int       `json:"team_size_preference" gorm:"default:null"`
+	SeatGroupID        *uuid.UUID `json:"seat_group_id" gorm:"type:uuid;default:null"`
+	IsAvailable        bool       `json:"is_available" gorm:"default:true"`
+	IsActive           bool       `json:"is_active" gorm:"default:true"`
+	CreatedAt          time.Time  `json:"created_at" gorm:"default:now()"`
+	UpdatedAt          time.Time  `json:"updated_at" gorm:"default:now()"`
 
 	// Relations
 	Room *Room `json:"room,omitempty" gorm:"foreignKey:RoomID"`
+}
+
+// BeforeCreate sets a new UUID if ID is zero (avoids PostgreSQL rejecting zero UUID)
+func (b *Block) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == uuid.Nil {
+		b.ID = uuid.New()
+	}
+	return nil
+}
+
+// BeforeCreate sets a new UUID if ID is zero
+func (r *Room) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == uuid.Nil {
+		r.ID = uuid.New()
+	}
+	return nil
+}
+
+// BeforeCreate sets a new UUID if ID is zero
+func (s *Seat) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
+}
+
+// BeforeCreate sets a new UUID if ID is zero
+func (s *SeatAllocation) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
 }
 
 // SeatAllocation represents a seat assignment to a team

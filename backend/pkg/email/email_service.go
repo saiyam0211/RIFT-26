@@ -303,28 +303,87 @@ func (s *EmailService) SendTicketResolvedEmail(to, teamName, subject, resolution
 	return s.sendEmail(to, emailSubject, body)
 }
 
-// SendBulkCustomEmail sends custom HTML email to multiple recipients
-func (s *EmailService) SendBulkCustomEmail(recipients []string, subject, htmlContent string) error {
-	// Send emails in batches to avoid SMTP rate limits
-	batchSize := 50
+// stripCRLF removes any CR/LF from a string (for use in headers so one line per header).
+func stripCRLF(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	return strings.ReplaceAll(s, "\n", " ")
+}
 
-	for i := 0; i < len(recipients); i += batchSize {
-		end := i + batchSize
+// normalizeSMTPBody ensures every line ends with \r\n and no line contains bare CR/LF.
+// SMTP (RFC 5321) requires CRLF line endings and forbids bare CR or LF within a line.
+func normalizeSMTPBody(body string) string {
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	body = strings.ReplaceAll(body, "\r", "\n")
+	lines := strings.Split(body, "\n")
+	out := strings.Join(lines, "\r\n")
+	if out != "" && !strings.HasSuffix(out, "\r\n") {
+		out += "\r\n"
+	}
+	return out
+}
+
+// sendEmailBCC sends a single email with all recipients in BCC (one SMTP transaction).
+// Uses "To: undisclosed-recipients:;" so recipients do not see each other's addresses.
+func (s *EmailService) sendEmailBCC(recipients []string, subject, htmlBody string) error {
+	if len(recipients) == 0 {
+		return nil
+	}
+	// All header values must be single line (no CR/LF)
+	subject = stripCRLF(subject)
+	fromName := stripCRLF(s.fromName)
+	fromEmail := stripCRLF(strings.TrimSpace(s.fromEmail))
+
+	from := fmt.Sprintf("%s <%s>", fromName, fromEmail)
+	headers := make(map[string]string)
+	headers["From"] = from
+	headers["To"] = "undisclosed-recipients:;"
+	headers["Subject"] = subject
+	headers["MIME-Version"] = "1.0"
+	headers["Content-Type"] = "text/html; charset=UTF-8"
+
+	message := ""
+	for k, v := range headers {
+		message += fmt.Sprintf("%s: %s\r\n", k, stripCRLF(v))
+	}
+	message += "\r\n" + normalizeSMTPBody(htmlBody)
+
+	// Recipient addresses must not contain CR/LF
+	cleanRecipients := make([]string, 0, len(recipients))
+	for _, r := range recipients {
+		addr := strings.TrimSpace(stripCRLF(r))
+		if addr != "" {
+			cleanRecipients = append(cleanRecipients, addr)
+		}
+	}
+	if len(cleanRecipients) == 0 {
+		return nil
+	}
+
+	auth := smtp.PlainAuth("", s.smtpUsername, s.smtpPassword, s.smtpHost)
+	addr := fmt.Sprintf("%s:%s", s.smtpHost, s.smtpPort)
+	err := smtp.SendMail(addr, auth, fromEmail, cleanRecipients, []byte(message))
+	if err != nil {
+		return fmt.Errorf("failed to send BCC email: %w", err)
+	}
+	return nil
+}
+
+// SendBulkCustomEmail sends one email per batch with all recipients in BCC (one SMTP transaction per batch).
+// Recipients see only "undisclosed-recipients" and do not see each other. Many SMTP servers limit
+// recipients per message (e.g. 100), so we batch to stay under typical limits.
+func (s *EmailService) SendBulkCustomEmail(recipients []string, subject, htmlContent string) error {
+	const bccBatchSize = 100 // Many SMTP servers allow ~100–500 recipients per message
+
+	for i := 0; i < len(recipients); i += bccBatchSize {
+		end := i + bccBatchSize
 		if end > len(recipients) {
 			end = len(recipients)
 		}
-
 		batch := recipients[i:end]
-		for _, recipient := range batch {
-			if err := s.sendEmail(recipient, subject, htmlContent); err != nil {
-				return fmt.Errorf("failed to send to %s: %w", recipient, err)
-			}
+		if err := s.sendEmailBCC(batch, subject, htmlContent); err != nil {
+			return fmt.Errorf("failed to send BCC batch (recipients %d-%d): %w", i+1, end, err)
 		}
-
-		// Small delay between batches to avoid rate limiting
-		//time.Sleep(100 * time.Millisecond)
 	}
-
 	return nil
 }
 

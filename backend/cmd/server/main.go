@@ -13,6 +13,8 @@ import (
 	"github.com/rift26/backend/internal/repository"
 	"github.com/rift26/backend/internal/services"
 	"github.com/rift26/backend/pkg/email"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -61,10 +63,18 @@ func main() {
 	// Initialize participant check-in repository
 	participantCheckinRepo := repository.NewParticipantCheckInRepository(db.DB)
 
+	// GORM for seat allocation (Bengaluru blocks/rooms/seats)
+	gormDB, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to connect GORM for seat allocation: %v", err)
+	}
+	seatAllocationService := services.NewSeatAllocationService(gormDB)
+
 	// Initialize handlers
-	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange)
+	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange, seatAllocationService)
 	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
-	scannerHandler := handlers.NewVolunteerHandler(checkinService, participantCheckinRepo, teamRepo, volunteerRepo) // Enhanced scanner/check-in handler
+	scannerHandler := handlers.NewVolunteerHandler(checkinService, participantCheckinRepo, teamRepo, volunteerRepo, seatAllocationService)
+	seatAllocatorHandler := handlers.NewSeatAllocatorHandler(gormDB)
 	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)                                      // Volunteer auth handler
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
@@ -167,8 +177,9 @@ func main() {
 		tableRoutes.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		tableRoutes.Use(middleware.RoleMiddleware("volunteer", "admin"))
 		{
-			tableRoutes.POST("/confirm", scannerHandler.ConfirmTable)   // Mark team as done
-			tableRoutes.GET("/pending", scannerHandler.GetPendingTeams) // Get pending teams
+			tableRoutes.POST("/confirm", scannerHandler.ConfirmTable)       // Mark team as done
+			tableRoutes.POST("/allocate-seat", scannerHandler.AllocateSeat) // Allocate Bengaluru seat for team
+			tableRoutes.GET("/pending", scannerHandler.GetPendingTeams)     // Get pending teams
 		}
 
 		// Admin login (public)
@@ -220,6 +231,22 @@ func main() {
 			adminRoutes.GET("/tables/:id", eventTableHandler.GetEventTable)
 			adminRoutes.PUT("/tables/:id", eventTableHandler.UpdateEventTable)
 			adminRoutes.DELETE("/tables/:id", eventTableHandler.DeleteEventTable)
+
+			// Seat Allocation (Bengaluru) - blocks, rooms, seats
+			adminRoutes.GET("/seat-allocation/blocks", seatAllocatorHandler.GetAllBlocks)
+			adminRoutes.POST("/seat-allocation/blocks", seatAllocatorHandler.CreateBlock)
+			adminRoutes.PUT("/seat-allocation/blocks/:id", seatAllocatorHandler.UpdateBlock)
+			adminRoutes.DELETE("/seat-allocation/blocks/:id", seatAllocatorHandler.DeleteBlock)
+			adminRoutes.GET("/seat-allocation/rooms", seatAllocatorHandler.GetRoomsByBlock)
+			adminRoutes.POST("/seat-allocation/rooms", seatAllocatorHandler.CreateRoom)
+			adminRoutes.POST("/seat-allocation/seats/grid", seatAllocatorHandler.CreateSeatsGrid)
+			adminRoutes.POST("/seat-allocation/seats/layout", seatAllocatorHandler.CreateSeatsLayout)
+			adminRoutes.GET("/seat-allocation/rooms/:room_id/layout", seatAllocatorHandler.GetRoomLayout)
+			adminRoutes.GET("/seat-allocation/rooms/:room_id/room-view", seatAllocatorHandler.GetRoomView)
+			adminRoutes.GET("/seat-allocation/rooms/:room_id/seats", seatAllocatorHandler.GetSeatsByRoom)
+			adminRoutes.PUT("/seat-allocation/seats/mark-team-size", seatAllocatorHandler.MarkSeatsForTeamSize)
+			adminRoutes.GET("/seat-allocation/allocations", seatAllocatorHandler.GetAllAllocations)
+			adminRoutes.GET("/seat-allocation/stats", seatAllocatorHandler.GetAllocationStats)
 		}
 	}
 

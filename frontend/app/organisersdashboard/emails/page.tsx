@@ -12,6 +12,7 @@ export default function EmailsPage() {
     const [htmlContent, setHTMLContent] = useState('');
     const [teamSizes, setTeamSizes] = useState<number[]>([]);
     const [cities, setCities] = useState<string[]>([]);
+    const [onlyRSVP1Done, setOnlyRSVP1Done] = useState(false);
     const [sending, setSending] = useState(false);
     const [emailLogs, setEmailLogs] = useState<any[]>([]);
     const [showLogs, setShowLogs] = useState(false);
@@ -20,7 +21,7 @@ export default function EmailsPage() {
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
     const [showSearch, setShowSearch] = useState(false);
 
-    const cityOptions = ['BLR', 'PUNE', 'HYD', 'CHN', 'DEL', 'MUM'];
+    const cityOptions = ['BLR', 'LKO', 'NOIDA', 'PUNE'];
     const teamSizeOptions = [1, 2, 3, 4, 5];
 
     useEffect(() => {
@@ -81,6 +82,7 @@ export default function EmailsPage() {
                     filters: {
                         team_sizes: teamSizes,
                         cities,
+                        only_rsvp1_done: onlyRSVP1Done,
                     },
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -91,6 +93,7 @@ export default function EmailsPage() {
             setHTMLContent('');
             setTeamSizes([]);
             setCities([]);
+            setOnlyRSVP1Done(false);
             setSelectedTeam(null);
             fetchEmailLogs();
         } catch (error: any) {
@@ -333,6 +336,20 @@ export default function EmailsPage() {
                                     </div>
                                 </div>
 
+                                <div className="md:col-span-2">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            checked={onlyRSVP1Done}
+                                            onChange={(e) => setOnlyRSVP1Done(e.target.checked)}
+                                            className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-red-600 focus:ring-red-600"
+                                        />
+                                        <span className="text-sm text-zinc-300 group-hover:text-white">
+                                            Only teams with <strong>RSVP I done</strong>, <strong>Final Confirmation pending</strong> (RSVP II not done)
+                                        </span>
+                                    </label>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-300 mb-2">
                                         Cities
@@ -360,12 +377,14 @@ export default function EmailsPage() {
                                 </div>
                             </div>
 
-                            {(teamSizes.length > 0 || cities.length > 0) && (
+                            {(teamSizes.length > 0 || cities.length > 0 || onlyRSVP1Done) && (
                                 <div className="mt-3 text-sm text-zinc-400">
                                     <strong className="text-white">Targeting:</strong>{' '}
+                                    {onlyRSVP1Done && 'RSVP I done, Final Confirmation pending only'}
+                                    {onlyRSVP1Done && (teamSizes.length > 0 || cities.length > 0) && ' • '}
                                     {teamSizes.length > 0 && `Teams of ${teamSizes.join(', ')} members`}
                                     {teamSizes.length > 0 && cities.length > 0 && ' in '}
-                                    {cities.length > 0 && cities.join(', ')}
+                                    {cities.length > 0 && cityOptions.filter((c) => cities.includes(c)).join(', ')}
                                 </div>
                             )}
                         </div>
@@ -440,7 +459,7 @@ export default function EmailsPage() {
                         )}
                     </button>
 
-                    {!selectedTeam && teamSizes.length === 0 && cities.length === 0 && (
+                    {!selectedTeam && teamSizes.length === 0 && cities.length === 0 && !onlyRSVP1Done && (
                         <p className="mt-3 text-sm text-yellow-500 text-center">
                             ⚠️ No filters selected - email will be sent to ALL teams
                         </p>

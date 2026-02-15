@@ -269,6 +269,12 @@ func (s *AnnouncementService) GetTeamsMatchingFilters(filters models.Announcemen
 	var args []interface{}
 	argCount := 0
 
+	// Filter: only teams with RSVP I done, Final Confirmation (RSVP II) not done.
+	// Exclude any team that has completed RSVP II (status rsvp2_done/checked_in or rsvp2_locked = true).
+	if filters.OnlyRSVP1Done {
+		query += " AND status = 'rsvp_done' AND (rsvp2_locked = false OR rsvp2_locked IS NULL)"
+	}
+
 	// Filter by team size
 	if len(filters.TeamSizes) > 0 {
 		placeholders := ""

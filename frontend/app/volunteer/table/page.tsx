@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Table, CheckCircle, X, Users, Clock, LogOut, RefreshCw } from 'lucide-react'
+import { Table, CheckCircle, X, Users, Clock, LogOut, RefreshCw, MapPin } from 'lucide-react'
 
 interface TeamMember {
     id: string
@@ -50,6 +50,8 @@ export default function VolunteerTablePage() {
     const [success, setSuccess] = useState('')
     const [volunteerInfo, setVolunteerInfo] = useState<VolunteerInfo | null>(null)
     const [stats, setStats] = useState({ pending: 0, confirmed: 0 })
+    const [allocating, setAllocating] = useState(false)
+    const [allocationResult, setAllocationResult] = useState<{ block_name: string; room_name: string; seat_label: string } | null>(null)
 
     // Real-time polling
     useEffect(() => {
@@ -143,6 +145,42 @@ export default function VolunteerTablePage() {
         }
     }
 
+    const handleAllocateSeat = async () => {
+        if (!currentTeam) return
+        setAllocating(true)
+        setError('')
+        setAllocationResult(null)
+
+        try {
+            const token = localStorage.getItem('volunteer_token')
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/table/allocate-seat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ team_id: currentTeam.team.id })
+            })
+
+            const data = await response.json().catch(() => ({}))
+            if (!response.ok) {
+                setError(data.error || 'Failed to allocate seat')
+                return
+            }
+
+            setAllocationResult({
+                block_name: data.block_name || '',
+                room_name: data.room_name || '',
+                seat_label: data.seat_label || ''
+            })
+            setSuccess('Seat allocated! Tell the team their location.')
+        } catch (err: any) {
+            setError('Failed to allocate seat')
+        } finally {
+            setAllocating(false)
+        }
+    }
+
     const handleConfirm = async () => {
         if (!currentTeam) return
         setProcessing(true)
@@ -169,6 +207,7 @@ export default function VolunteerTablePage() {
             // Auto-advance to next team
             setTimeout(() => {
                 setSuccess('')
+                setAllocationResult(null)
                 setCurrentTeam(null) // Will auto-show next team via useEffect
             }, 1500)
 
@@ -190,6 +229,7 @@ export default function VolunteerTablePage() {
 
     const handleSelectTeam = (team: PendingTeam) => {
         setCurrentTeam(team)
+        setAllocationResult(null)
     }
 
     const handleLogout = () => {
@@ -360,6 +400,19 @@ export default function VolunteerTablePage() {
                                             Write names on badges and hand them over to the team
                                         </p>
 
+                                        {allocationResult && (
+                                            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/50 rounded-xl flex items-center gap-3">
+                                                <MapPin className="text-emerald-400 shrink-0" size={24} />
+                                                <div>
+                                                    <p className="font-semibold text-emerald-300">Seat allocated</p>
+                                                    <p className="text-white">
+                                                        Block: <strong>{allocationResult.block_name}</strong> → Room: <strong>{allocationResult.room_name}</strong> → Seat: <strong>{allocationResult.seat_label}</strong>
+                                                    </p>
+                                                    <p className="text-zinc-400 text-sm mt-1">Convey this to the participant team.</p>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="space-y-3 mb-8">
                                             {currentTeam.participants.map((participant, index) => (
                                                 <div
@@ -381,7 +434,7 @@ export default function VolunteerTablePage() {
                                                                 {participant.participant_name}
                                                             </p>
                                                             <p className="text-xs text-zinc-400">
-                                                                {participant.participant_role === 'leader' ? '👑 Team Leader' : 'Team Member'}
+                                                                {participant.participant_role === 'leader' ? 'Team Leader' : 'Team Member'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -390,17 +443,27 @@ export default function VolunteerTablePage() {
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="flex gap-4">
-                                            <button
-                                                onClick={handleSkip}
-                                                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
-                                            >
-                                                Skip for Now
-                                            </button>
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex gap-4">
+                                                <button
+                                                    onClick={handleAllocateSeat}
+                                                    disabled={allocating || !!allocationResult}
+                                                    className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <MapPin size={20} />
+                                                    {allocating ? 'Allocating...' : allocationResult ? 'Seat allocated' : 'Allocate seat'}
+                                                </button>
+                                                <button
+                                                    onClick={handleSkip}
+                                                    className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
+                                                >
+                                                    Skip for Now
+                                                </button>
+                                            </div>
                                             <button
                                                 onClick={handleConfirm}
                                                 disabled={processing}
-                                                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg"
+                                                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg"
                                             >
                                                 <CheckCircle size={24} />
                                                 {processing ? 'Processing...' : 'Mark as Done'}

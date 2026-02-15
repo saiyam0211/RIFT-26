@@ -9,16 +9,18 @@ import (
 )
 
 type TeamHandler struct {
-	teamService     *services.TeamService
-	jwtSecret       string
-	allowCityChange bool
+	teamService           *services.TeamService
+	jwtSecret              string
+	allowCityChange        bool
+	seatAllocationService  *services.SeatAllocationService
 }
 
-func NewTeamHandler(teamService *services.TeamService, jwtSecret string, allowCityChange bool) *TeamHandler {
+func NewTeamHandler(teamService *services.TeamService, jwtSecret string, allowCityChange bool, seatAllocationService *services.SeatAllocationService) *TeamHandler {
 	return &TeamHandler{
-		teamService:     teamService,
-		jwtSecret:       jwtSecret,
-		allowCityChange: allowCityChange,
+		teamService:          teamService,
+		jwtSecret:            jwtSecret,
+		allowCityChange:      allowCityChange,
+		seatAllocationService: seatAllocationService,
 	}
 }
 
@@ -121,10 +123,26 @@ func (h *TeamHandler) GetDashboard(c *gin.Context) {
 		return
 	}
 
+	var seatAllocation interface{}
+	if h.seatAllocationService != nil {
+		if alloc, err := h.seatAllocationService.GetTeamAllocation(team.ID); err == nil {
+			seatAllocation = gin.H{
+				"block_name": alloc.BlockName,
+				"room_name":  alloc.RoomName,
+				"seat_label": alloc.SeatLabel,
+				"team_size":  alloc.TeamSize,
+			}
+		}
+	}
+	if seatAllocation == nil {
+		seatAllocation = nil
+	}
+
 	c.JSON(200, gin.H{
-		"team":          team,
-		"announcements": announcements,
-		"qr_code":       qrCode,
+		"team":            team,
+		"announcements":   announcements,
+		"qr_code":         qrCode,
+		"seat_allocation": seatAllocation,
 	})
 }
 

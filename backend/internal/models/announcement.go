@@ -112,9 +112,10 @@ type ResolveTicketRequest struct {
 
 // Announcement filters for targeting
 type AnnouncementFilters struct {
-	TeamSizes []int    `json:"team_sizes,omitempty"`
-	Cities    []string `json:"cities,omitempty"`
-	TeamIDs   []string `json:"team_ids,omitempty"`
+	TeamSizes     []int    `json:"team_sizes,omitempty"`
+	Cities        []string `json:"cities,omitempty"`
+	TeamIDs       []string `json:"team_ids,omitempty"`
+	OnlyRSVP1Done bool     `json:"only_rsvp1_done,omitempty"` // true = only teams with RSVP I done, RSVP II not done (status = rsvp_done)
 }
 
 // Email log model
@@ -130,7 +131,7 @@ type EmailLog struct {
 }
 
 type SendEmailRequest struct {
-	Subject     string              `json:"subject" binding:"required,min=5,max=255"`
+	Subject     string              `json:"subject" binding:"required,min=1,max=255"`
 	HTMLContent string              `json:"html_content" binding:"required"`
 	Filters     AnnouncementFilters `json:"filters"`
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -136,10 +137,27 @@ func (h *BulkEmailHandler) getRecipientEmails(teamIDs []uuid.UUID) ([]string, er
 		if err := rows.Scan(&email); err != nil {
 			continue
 		}
+		email = strings.TrimSpace(email)
+		// Skip invalid entries (e.g. name stored in email column per RFC 5321)
+		if !isValidEmailAddress(email) {
+			continue
+		}
 		emails = append(emails, email)
 	}
 
 	return emails, nil
+}
+
+// isValidEmailAddress returns true if s looks like a valid RFC 5321 address (has @ and domain with .).
+func isValidEmailAddress(s string) bool {
+	if s == "" || !strings.Contains(s, "@") {
+		return false
+	}
+	parts := strings.Split(s, "@")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return false
+	}
+	return strings.Contains(parts[1], ".")
 }
 
 // GET /api/v1/admin/email-logs

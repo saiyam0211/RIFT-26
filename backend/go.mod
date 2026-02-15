@@ -10,7 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	golang.org/x/crypto v0.18.0
+	golang.org/x/crypto v0.31.0
 	google.golang.org/api v0.155.0
 	gorm.io/gorm v1.31.1
 )
@@ -41,6 +41,10 @@ require (
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.6.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -59,11 +63,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/otel/trace v1.21.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/net v0.19.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
-	golang.org/x/sync v0.9.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
@@ -74,4 +78,5 @@ require (
 	google.golang.org/grpc v1.60.1 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gorm.io/driver/postgres v1.6.0 // indirect
 )

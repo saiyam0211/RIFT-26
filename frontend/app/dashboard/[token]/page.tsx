@@ -7,7 +7,7 @@ import QRCode from 'react-qr-code'
 import { Team, Announcement } from '@/types'
 import RIFTBackground from '@/components/RIFTBackground'
 import CustomLoader from '@/components/CustomLoader'
-import { X, Calendar, Ticket, Bell } from 'lucide-react'
+import { X, Calendar, Ticket, Bell, MapPin } from 'lucide-react'
 
 export default function DashboardPage() {
     const params = useParams()
@@ -17,6 +17,7 @@ export default function DashboardPage() {
 
     const [team, setTeam] = useState<Team | null>(null)
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
+    const [seatAllocation, setSeatAllocation] = useState<{ block_name: string; room_name: string; seat_label: string } | null>(null)
     const [qrCodeData, setQRCodeData] = useState('')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -37,6 +38,7 @@ export default function DashboardPage() {
             const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/${token}`)
             setTeam(response.data.team)
             setAnnouncements(response.data.announcements || [])
+            setSeatAllocation(response.data.seat_allocation || null)
 
             // Get current user's email from localStorage (set during auth)
             const storedEmail = localStorage.getItem('user_email')
@@ -372,6 +374,19 @@ export default function DashboardPage() {
                             <p className="text-gray-500 text-xs mt-3 text-center leading-relaxed group-hover:text-gray-400 transition">
                                 Click to enlarge
                             </p>
+                        </div>
+                    )}
+
+                    {/* Seat allocation (Bengaluru) */}
+                    {seatAllocation && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3">
+                            <MapPin className="text-emerald-400 shrink-0" size={24} />
+                            <div>
+                                <p className="text-emerald-300 font-semibold">Your seat</p>
+                                <p className="text-white">
+                                    Block <strong>{seatAllocation.block_name}</strong> → Room <strong>{seatAllocation.room_name}</strong> → Seat <strong>{seatAllocation.seat_label}</strong>
+                                </p>
+                            </div>
                         </div>
                     )}
 

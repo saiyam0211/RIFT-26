@@ -17,9 +17,9 @@ func NewSeatAllocationService(db *gorm.DB) *SeatAllocationService {
 	return &SeatAllocationService{db: db}
 }
 
-// AllocateSeat allocates a seat to a team using smart allocation logic
+// AllocateSeat allocates a seat (or group of seats for teams of 2/3/4) to a team.
+// Teams of 2/3/4 are allocated only to merged seats marked for that team size.
 func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.UUID) (*models.SeatAllocation, error) {
-	// Start transaction with proper isolation
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -30,111 +30,150 @@ func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.
 		}
 	}()
 
-	// Check if team already has a seat allocated
 	var existing models.SeatAllocation
 	if err := tx.Where("team_id = ?", teamID).First(&existing).Error; err == nil {
 		tx.Rollback()
 		return nil, errors.New("team already has a seat allocated")
 	}
 
-	// Get team size (count checked-in participants)
 	teamSize, err := s.getTeamSize(tx, teamID)
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("failed to get team size: %w", err)
 	}
-
 	if teamSize == 0 {
 		tx.Rollback()
 		return nil, errors.New("no participants checked in for this team")
 	}
 
-	// Find best available seat using smart allocation
-	seat, err := s.findBestAvailableSeat(tx, teamSize)
+	seats, err := s.findBestAvailableSeats(tx, teamSize)
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("no available seats: %w", err)
 	}
 
-	// Lock the seat row for update
-	if err := tx.Model(&models.Seat{}).
-		Where("id = ? AND is_available = true", seat.ID).
-		Update("is_available", false).Error; err != nil {
-		tx.Rollback()
-		return nil, errors.New("seat was just allocated by another volunteer")
+	for _, seat := range seats {
+		if err := tx.Model(&models.Seat{}).
+			Where("id = ? AND is_available = true", seat.ID).
+			Update("is_available", false).Error; err != nil {
+			tx.Rollback()
+			return nil, errors.New("seat was just allocated by another volunteer")
+		}
 	}
 
-	// Update room occupancy
+	var room models.Room
+	if err := tx.Preload("Block").First(&room, seats[0].RoomID).Error; err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to get room info: %w", err)
+	}
+
 	if err := tx.Model(&models.Room{}).
-		Where("id = ?", seat.RoomID).
+		Where("id = ?", seats[0].RoomID).
 		UpdateColumn("current_occupancy", gorm.Expr("current_occupancy + ?", teamSize)).Error; err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("failed to update room occupancy: %w", err)
 	}
 
-	// Get room and block info for denormalized fields
-	var room models.Room
-	if err := tx.Preload("Block").First(&room, seat.RoomID).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("failed to get room info: %w", err)
+	// Build combined label for display (e.g. "A1-A2")
+	combinedLabel := seats[0].SeatLabel
+	for i := 1; i < len(seats); i++ {
+		combinedLabel += "-" + seats[i].SeatLabel
 	}
 
-	// Create allocation record
-	allocation := &models.SeatAllocation{
-		TeamID:      teamID,
-		SeatID:      seat.ID,
-		BlockID:     room.BlockID,
-		RoomID:      seat.RoomID,
-		AllocatedBy: volunteerID,
-		TeamSize:    teamSize,
-		BlockName:   room.Block.Name,
-		RoomName:    room.Name,
-		SeatLabel:   seat.SeatLabel,
+	var firstAlloc *models.SeatAllocation
+	for i, seat := range seats {
+		alloc := &models.SeatAllocation{
+			TeamID:      teamID,
+			SeatID:      seat.ID,
+			BlockID:     room.BlockID,
+			RoomID:      seat.RoomID,
+			AllocatedBy: volunteerID,
+			TeamSize:    teamSize,
+			BlockName:   room.Block.Name,
+			RoomName:    room.Name,
+			SeatLabel:   combinedLabel,
+		}
+		if err := tx.Create(alloc).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to create allocation: %w", err)
+		}
+		if i == 0 {
+			firstAlloc = alloc
+		}
 	}
 
-	if err := tx.Create(allocation).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("failed to create allocation: %w", err)
-	}
-
-	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
-	return allocation, nil
+	return firstAlloc, nil
 }
 
-// findBestAvailableSeat implements smart allocation logic
-func (s *SeatAllocationService) findBestAvailableSeat(tx *gorm.DB, teamSize int) (*models.Seat, error) {
-	var seat models.Seat
-
-	// Strategy 1: Try to find a seat with matching team_size_preference
-	err := tx.Joins("JOIN rooms ON rooms.id = seats.room_id").
+// baseJoin returns a fresh query chain for Bengaluru seat lookups (do not reuse; GORM has no Clone).
+func baseJoin(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&models.Seat{}).
+		Joins("JOIN rooms ON rooms.id = seats.room_id").
 		Joins("JOIN blocks ON blocks.id = rooms.block_id").
 		Where("seats.is_available = ? AND seats.is_active = ? AND rooms.is_active = ? AND blocks.is_active = ?",
 			true, true, true, true).
-		Where("seats.team_size_preference = ?", teamSize).
-		Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
-		First(&seat).Error
+		Where("blocks.city = ?", "bengaluru")
+}
 
-	if err == nil {
-		return &seat, nil
+// findBestAvailableSeats returns one or more seats (a group) for the given team size.
+// Teams of 2, 3, or 4: only seats with matching team_size_preference and same seat_group_id (all available).
+// Team of 1: single seat with team_size_preference IS NULL (or unset).
+func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int) ([]*models.Seat, error) {
+	if teamSize >= 2 && teamSize <= 4 {
+		// Strict: only merged groups of exactly this team size (all seats in group available)
+		var candidates []models.Seat
+		err := baseJoin(tx).
+			Where("seats.team_size_preference = ? AND seats.seat_group_id IS NOT NULL", teamSize).
+			Order("blocks.display_order ASC, rooms.display_order ASC, seats.seat_group_id ASC, seats.row_number ASC, seats.column_number ASC").
+			Find(&candidates).Error
+		if err != nil || len(candidates) == 0 {
+			return nil, errors.New("no available seats for this team size")
+		}
+		// Group by seat_group_id; return first group that has exactly teamSize and all available
+		byGroup := make(map[uuid.UUID][]*models.Seat)
+		for i := range candidates {
+			if candidates[i].SeatGroupID == nil {
+				continue
+			}
+			gid := *candidates[i].SeatGroupID
+			byGroup[gid] = append(byGroup[gid], &candidates[i])
+		}
+		for _, groupSeats := range byGroup {
+			if len(groupSeats) != teamSize {
+				continue
+			}
+			allAvail := true
+			for _, seat := range groupSeats {
+				if !seat.IsAvailable {
+					allAvail = false
+					break
+				}
+			}
+			if allAvail {
+				return groupSeats, nil
+			}
+		}
+		return nil, errors.New("no available seats for this team size")
 	}
 
-	// Strategy 2: Find any available seat (no preference)
-	err = tx.Joins("JOIN rooms ON rooms.id = seats.room_id").
-		Joins("JOIN blocks ON blocks.id = rooms.block_id").
-		Where("seats.is_available = ? AND seats.is_active = ? AND rooms.is_active = ? AND blocks.is_active = ?",
-			true, true, true, true).
+	// Team of 1: single seat, prefer no team_size_preference (solo seat)
+	var seat models.Seat
+	err := baseJoin(tx).
+		Where("seats.team_size_preference IS NULL").
 		Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
 		First(&seat).Error
-
+	if err != nil {
+		err = baseJoin(tx).
+			Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
+			First(&seat).Error
+	}
 	if err != nil {
 		return nil, errors.New("no available seats found")
 	}
-
-	return &seat, nil
+	return []*models.Seat{&seat}, nil
 }
 
 // getTeamSize counts checked-in participants for a team

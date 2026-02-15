@@ -14,10 +14,11 @@ import (
 )
 
 type VolunteerHandler struct {
-	checkinService         *services.CheckinService
-	participantCheckinRepo *repository.ParticipantCheckInRepository
-	teamRepo               *repository.TeamRepository
-	volunteerRepo          *repository.VolunteerRepository
+	checkinService          *services.CheckinService
+	participantCheckinRepo  *repository.ParticipantCheckInRepository
+	teamRepo                *repository.TeamRepository
+	volunteerRepo           *repository.VolunteerRepository
+	seatAllocationService   *services.SeatAllocationService
 }
 
 func NewVolunteerHandler(
@@ -25,12 +26,14 @@ func NewVolunteerHandler(
 	participantCheckinRepo *repository.ParticipantCheckInRepository,
 	teamRepo *repository.TeamRepository,
 	volunteerRepo *repository.VolunteerRepository,
+	seatAllocationService *services.SeatAllocationService,
 ) *VolunteerHandler {
 	return &VolunteerHandler{
 		checkinService:         checkinService,
 		participantCheckinRepo: participantCheckinRepo,
 		teamRepo:               teamRepo,
 		volunteerRepo:          volunteerRepo,
+		seatAllocationService:  seatAllocationService,
 	}
 }
 
@@ -255,6 +258,43 @@ func (h *VolunteerHandler) ConfirmTable(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Team confirmed successfully"})
+}
+
+// AllocateSeat allocates a Bengaluru seat to a team (table volunteer).
+// POST /api/v1/table/allocate-seat
+func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
+	var req struct {
+		TeamID uuid.UUID `json:"team_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	volunteerID, exists := middleware.GetUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Volunteer ID not found"})
+		return
+	}
+
+	if h.seatAllocationService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Seat allocation not configured"})
+		return
+	}
+
+	allocation, err := h.seatAllocationService.AllocateSeat(req.TeamID, volunteerID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "Seat allocated successfully",
+		"block_name":   allocation.BlockName,
+		"room_name":    allocation.RoomName,
+		"seat_label":   allocation.SeatLabel,
+		"team_size":    allocation.TeamSize,
+	})
 }
 
 // GetVolunteerLogs gets logs for a specific volunteer (admin only)

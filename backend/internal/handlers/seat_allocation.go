@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/models"
+	"github.com/rift26/backend/internal/services"
 	"gorm.io/gorm"
 )
 
@@ -36,7 +38,7 @@ func (h *SeatAllocatorHandler) CreateBlock(c *gin.Context) {
 	block.DisplayOrder = maxOrder + 1
 
 	if err := h.db.Create(&block).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create block"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create block", "details": err.Error()})
 		return
 	}
 
@@ -208,6 +210,145 @@ func (h *SeatAllocatorHandler) CreateSeatsGrid(c *gin.Context) {
 	})
 }
 
+// CreateSeatsLayout creates seats from a visual layout and optionally saves full layout JSON (cells, walls, pillars, screens).
+func (h *SeatAllocatorHandler) CreateSeatsLayout(c *gin.Context) {
+	var req struct {
+		RoomID uuid.UUID `json:"room_id" binding:"required"`
+		Seats  []struct {
+			RowNumber    int `json:"row_number" binding:"required,min=1"`
+			ColumnNumber int `json:"column_number" binding:"required,min=1"`
+		} `json:"seats"`
+		Groups []struct {
+			TeamSize  int `json:"team_size" binding:"required,oneof=2 3 4"`
+			Positions []struct {
+				RowNumber    int `json:"row_number" binding:"required,min=1"`
+				ColumnNumber int `json:"column_number" binding:"required,min=1"`
+			} `json:"positions" binding:"required,dive"`
+		} `json:"groups"`
+		Layout *struct {
+			Rows   int               `json:"rows"`
+			Cols   int               `json:"cols"`
+			Cells  map[string]string `json:"cells"`  // "r,c" -> "seat"|"space"|"entrance"|"wall"|"pillar"|"screen"
+			Groups []struct {
+				ID        string   `json:"id"`
+				Positions []string `json:"positions"` // "r,c"
+				TeamSize  int      `json:"team_size"`
+			} `json:"groups"`
+		} `json:"layout"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate group sizes match positions
+	for _, g := range req.Groups {
+		if len(g.Positions) != g.TeamSize {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("group team_size %d must have exactly %d positions", g.TeamSize, g.TeamSize)})
+			return
+		}
+	}
+
+	var room models.Room
+	if err := h.db.First(&room, "id = ?", req.RoomID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
+	if err := h.db.Unscoped().Where("room_id = ?", req.RoomID).Delete(&models.Seat{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear existing seats"})
+		return
+	}
+
+	rowLabels := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+	labelFor := func(row int) string {
+		if row >= 1 && row <= len(rowLabels) {
+			return rowLabels[row-1]
+		}
+		return "Row" + strconv.Itoa(row)
+	}
+
+	seen := make(map[string]bool)
+	type pos struct{ RowNumber, ColumnNumber int }
+	var singleSeats []pos
+	for _, s := range req.Seats {
+		key := fmt.Sprintf("%d,%d", s.RowNumber, s.ColumnNumber)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		singleSeats = append(singleSeats, pos{s.RowNumber, s.ColumnNumber})
+	}
+
+	// Mark positions used by groups so we don't double-create
+	for _, g := range req.Groups {
+		for _, p := range g.Positions {
+			seen[fmt.Sprintf("%d,%d", p.RowNumber, p.ColumnNumber)] = true
+		}
+	}
+
+	var seats []models.Seat
+
+	for _, pos := range singleSeats {
+		seatLabel := fmt.Sprintf("%s%d", labelFor(pos.RowNumber), pos.ColumnNumber)
+		seats = append(seats, models.Seat{
+			RoomID:       req.RoomID,
+			RowNumber:    pos.RowNumber,
+			ColumnNumber: pos.ColumnNumber,
+			SeatLabel:    seatLabel,
+			IsAvailable:  true,
+			IsActive:     true,
+		})
+	}
+
+	for _, g := range req.Groups {
+		groupID := uuid.New()
+		teamSize := g.TeamSize
+		for _, p := range g.Positions {
+			seatLabel := fmt.Sprintf("%s%d", labelFor(p.RowNumber), p.ColumnNumber)
+			seats = append(seats, models.Seat{
+				RoomID:             req.RoomID,
+				RowNumber:          p.RowNumber,
+				ColumnNumber:       p.ColumnNumber,
+				SeatLabel:          seatLabel,
+				TeamSizePreference: &teamSize,
+				SeatGroupID:        &groupID,
+				IsAvailable:        true,
+				IsActive:           true,
+			})
+		}
+	}
+
+	if len(seats) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one seat or group required"})
+		return
+	}
+
+	if err := h.db.CreateInBatches(seats, 100).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create seats"})
+		return
+	}
+
+	updates := map[string]interface{}{
+		"capacity":          len(seats),
+		"current_occupancy": 0,
+	}
+	if req.Layout != nil {
+		layoutBytes, _ := json.Marshal(req.Layout)
+		updates["layout_json"] = layoutBytes
+	}
+	if err := h.db.Model(&room).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update room"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": fmt.Sprintf("Created %d seats for room %s", len(seats), room.Name),
+		"count":   len(seats),
+	})
+}
+
 func (h *SeatAllocatorHandler) GetSeatsByRoom(c *gin.Context) {
 	roomID := c.Param("room_id")
 
@@ -219,6 +360,82 @@ func (h *SeatAllocatorHandler) GetSeatsByRoom(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, seats)
+}
+
+// GetRoomLayout returns the saved layout JSON for the room (for the canvas builder).
+func (h *SeatAllocatorHandler) GetRoomLayout(c *gin.Context) {
+	roomID := c.Param("room_id")
+
+	var room models.Room
+	if err := h.db.Select("id", "name", "layout_json").First(&room, "id = ?", roomID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
+	var layout interface{}
+	if len(room.LayoutJSON) > 0 {
+		if err := json.Unmarshal(room.LayoutJSON, &layout); err != nil {
+			c.JSON(http.StatusOK, gin.H{"room_id": room.ID, "room_name": room.Name, "layout": nil})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"room_id": room.ID, "room_name": room.Name, "layout": layout})
+}
+
+// GetRoomView returns layout plus allocations for this room: each team with name and list of (row, col) for merged display.
+func (h *SeatAllocatorHandler) GetRoomView(c *gin.Context) {
+	roomID := c.Param("room_id")
+
+	var room models.Room
+	if err := h.db.First(&room, "id = ?", roomID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
+	var layout interface{}
+	if len(room.LayoutJSON) > 0 {
+		_ = json.Unmarshal(room.LayoutJSON, &layout)
+	}
+
+	var allocations []models.SeatAllocation
+	if err := h.db.Preload("Team").Preload("Seat").
+		Where("room_id = ?", roomID).
+		Find(&allocations).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch allocations"})
+		return
+	}
+
+	// Group by team_id: each team has name and list of positions (row, col)
+	type teamAlloc struct {
+		TeamID   string     `json:"team_id"`
+		TeamName string     `json:"team_name"`
+		SeatLabel string   `json:"seat_label"`
+		Positions []struct{ Row int `json:"row"`; Col int `json:"col"` } `json:"positions"`
+	}
+	byTeam := make(map[uuid.UUID]*teamAlloc)
+	for _, a := range allocations {
+		if byTeam[a.TeamID] == nil {
+			ta := &teamAlloc{TeamID: a.TeamID.String(), SeatLabel: a.SeatLabel}
+			if a.Team != nil {
+				ta.TeamName = a.Team.TeamName
+			}
+			byTeam[a.TeamID] = ta
+		}
+		if a.Seat != nil {
+			byTeam[a.TeamID].Positions = append(byTeam[a.TeamID].Positions, struct{ Row int `json:"row"`; Col int `json:"col"` }{a.Seat.RowNumber, a.Seat.ColumnNumber})
+		}
+	}
+	var teamAllocs []*teamAlloc
+	for _, ta := range byTeam {
+		teamAllocs = append(teamAllocs, ta)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"room_id":     room.ID,
+		"room_name":   room.Name,
+		"layout":      layout,
+		"allocations": teamAllocs,
+	})
 }
 
 // MarkSeatsForTeamSize allows updating multiple seats to have a team preference
@@ -284,4 +501,14 @@ func (h *SeatAllocatorHandler) GetAllAllocations(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// GetAllocationStats returns seat allocation statistics (for admin dashboard)
+func (h *SeatAllocatorHandler) GetAllocationStats(c *gin.Context) {
+	stats, err := services.NewSeatAllocationService(h.db).GetAllocationStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
 }

@@ -1,0 +1,1 @@
+ALTER TABLE rooms DROP COLUMN IF EXISTS layout_json;

@@ -12,7 +12,8 @@ import {
     Mail,
     LogOut,
     User,
-    Table
+    Table,
+    MapPin
 } from 'lucide-react';
 import { getAdminToken, getAdminUser, removeAdminToken } from '../../src/lib/admin-auth';
 
@@ -46,6 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Teams', path: '/organisersdashboard/teams', icon: Users },
         { name: 'Volunteers', path: '/organisersdashboard/volunteers', icon: Users },
         { name: 'Tables', path: '/organisersdashboard/tables', icon: Table },
+        { name: 'Seat Allocation', path: '/organisersdashboard/seat-allocation', icon: MapPin },
         { name: 'Tickets', path: '/organisersdashboard/tickets', icon: Ticket },
         { name: 'Announcements', path: '/organisersdashboard/announcements', icon: Megaphone },
         { name: 'Emails', path: '/organisersdashboard/emails', icon: Mail },
