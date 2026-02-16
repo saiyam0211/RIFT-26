@@ -271,8 +271,23 @@ func (s *AnnouncementService) GetTeamsMatchingFilters(filters models.Announcemen
 
 	// Filter: only teams with RSVP I done, Final Confirmation (RSVP II) not done.
 	// Exclude any team that has completed RSVP II (status rsvp2_done/checked_in or rsvp2_locked = true).
-	if filters.OnlyRSVP1Done {
-		query += " AND status = 'rsvp_done' AND (rsvp2_locked = false OR rsvp2_locked IS NULL)"
+	// Filter: only shortlisted teams who haven't filled RSVP I (status = shortlisted).
+	// If both are set, include teams matching either condition.
+	if filters.OnlyRSVP1Done || filters.OnlyShortlistedNoRSVP1 {
+		conditions := []string{}
+		if filters.OnlyRSVP1Done {
+			conditions = append(conditions, "(status = 'rsvp_done' AND (rsvp2_locked = false OR rsvp2_locked IS NULL))")
+		}
+		if filters.OnlyShortlistedNoRSVP1 {
+			conditions = append(conditions, "status = 'shortlisted'")
+		}
+		if len(conditions) > 0 {
+			query += " AND (" + conditions[0]
+			for i := 1; i < len(conditions); i++ {
+				query += " OR " + conditions[i]
+			}
+			query += ")"
+		}
 	}
 
 	// Filter by team size

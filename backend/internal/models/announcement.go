@@ -112,10 +112,11 @@ type ResolveTicketRequest struct {
 
 // Announcement filters for targeting
 type AnnouncementFilters struct {
-	TeamSizes     []int    `json:"team_sizes,omitempty"`
-	Cities        []string `json:"cities,omitempty"`
-	TeamIDs       []string `json:"team_ids,omitempty"`
-	OnlyRSVP1Done bool     `json:"only_rsvp1_done,omitempty"` // true = only teams with RSVP I done, RSVP II not done (status = rsvp_done)
+	TeamSizes            []int    `json:"team_sizes,omitempty"`
+	Cities               []string `json:"cities,omitempty"`
+	TeamIDs              []string `json:"team_ids,omitempty"`
+	OnlyRSVP1Done        bool     `json:"only_rsvp1_done,omitempty"`         // true = only teams with RSVP I done, RSVP II not done (status = rsvp_done)
+	OnlyShortlistedNoRSVP1 bool   `json:"only_shortlisted_no_rsvp1,omitempty"` // true = only teams shortlisted who haven't filled RSVP I (status = shortlisted)
 }
 
 // Email log model

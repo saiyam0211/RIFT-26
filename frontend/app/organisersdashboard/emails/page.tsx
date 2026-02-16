@@ -13,6 +13,7 @@ export default function EmailsPage() {
     const [teamSizes, setTeamSizes] = useState<number[]>([]);
     const [cities, setCities] = useState<string[]>([]);
     const [onlyRSVP1Done, setOnlyRSVP1Done] = useState(false);
+    const [onlyShortlistedNoRSVP1, setOnlyShortlistedNoRSVP1] = useState(false);
     const [sending, setSending] = useState(false);
     const [emailLogs, setEmailLogs] = useState<any[]>([]);
     const [showLogs, setShowLogs] = useState(false);
@@ -83,17 +84,24 @@ export default function EmailsPage() {
                         team_sizes: teamSizes,
                         cities,
                         only_rsvp1_done: onlyRSVP1Done,
+                        only_shortlisted_no_rsvp1: onlyShortlistedNoRSVP1,
                     },
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            alert(`Email sent successfully to ${response.data.recipients_count} recipients!`);
+            const count = response.data?.recipients_count ?? 0;
+            if (count === 0) {
+                alert(response.data?.message || 'No teams match the specified filters; no emails sent.');
+            } else {
+                alert(`Email sent successfully to ${count} recipients!`);
+            }
             setSubject('');
             setHTMLContent('');
             setTeamSizes([]);
             setCities([]);
             setOnlyRSVP1Done(false);
+            setOnlyShortlistedNoRSVP1(false);
             setSelectedTeam(null);
             fetchEmailLogs();
         } catch (error: any) {
@@ -336,7 +344,7 @@ export default function EmailsPage() {
                                     </div>
                                 </div>
 
-                                <div className="md:col-span-2">
+                                <div className="md:col-span-2 space-y-2">
                                     <label className="flex items-center gap-2 cursor-pointer group">
                                         <input
                                             type="checkbox"
@@ -346,6 +354,17 @@ export default function EmailsPage() {
                                         />
                                         <span className="text-sm text-zinc-300 group-hover:text-white">
                                             Only teams with <strong>RSVP I done</strong>, <strong>Final Confirmation pending</strong> (RSVP II not done)
+                                        </span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            checked={onlyShortlistedNoRSVP1}
+                                            onChange={(e) => setOnlyShortlistedNoRSVP1(e.target.checked)}
+                                            className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-red-600 focus:ring-red-600"
+                                        />
+                                        <span className="text-sm text-zinc-300 group-hover:text-white">
+                                            Only <strong>shortlisted</strong> teams who <strong>haven&apos;t filled RSVP I</strong>
                                         </span>
                                     </label>
                                 </div>
@@ -377,11 +396,13 @@ export default function EmailsPage() {
                                 </div>
                             </div>
 
-                            {(teamSizes.length > 0 || cities.length > 0 || onlyRSVP1Done) && (
+                            {(teamSizes.length > 0 || cities.length > 0 || onlyRSVP1Done || onlyShortlistedNoRSVP1) && (
                                 <div className="mt-3 text-sm text-zinc-400">
                                     <strong className="text-white">Targeting:</strong>{' '}
                                     {onlyRSVP1Done && 'RSVP I done, Final Confirmation pending only'}
-                                    {onlyRSVP1Done && (teamSizes.length > 0 || cities.length > 0) && ' • '}
+                                    {onlyRSVP1Done && onlyShortlistedNoRSVP1 && ' • '}
+                                    {onlyShortlistedNoRSVP1 && 'Shortlisted, RSVP I not done only'}
+                                    {(onlyRSVP1Done || onlyShortlistedNoRSVP1) && (teamSizes.length > 0 || cities.length > 0) && ' • '}
                                     {teamSizes.length > 0 && `Teams of ${teamSizes.join(', ')} members`}
                                     {teamSizes.length > 0 && cities.length > 0 && ' in '}
                                     {cities.length > 0 && cityOptions.filter((c) => cities.includes(c)).join(', ')}
@@ -459,7 +480,7 @@ export default function EmailsPage() {
                         )}
                     </button>
 
-                    {!selectedTeam && teamSizes.length === 0 && cities.length === 0 && !onlyRSVP1Done && (
+                    {!selectedTeam && teamSizes.length === 0 && cities.length === 0 && !onlyRSVP1Done && !onlyShortlistedNoRSVP1 && (
                         <p className="mt-3 text-sm text-yellow-500 text-center">
                             ⚠️ No filters selected - email will be sent to ALL teams
                         </p>

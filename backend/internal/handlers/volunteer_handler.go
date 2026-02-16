@@ -98,6 +98,25 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 		return
 	}
 
+	// Volunteer must be assigned to a table; otherwise the team will never appear in any table viewer
+	if volunteer.TableID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer not assigned to a table"})
+		return
+	}
+
+	// Get team details early to validate location (city) against volunteer/table city
+	team, err := h.teamRepo.GetByID(c.Request.Context(), req.TeamID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
+		return
+	}
+
+	// Ensure team city matches volunteer/table city (e.g. BLR/PUNE/etc.)
+	if team.City != nil && string(*team.City) != volunteer.City {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team location does not match your table location"})
+		return
+	}
+
 	// Create participant check-ins
 	checkIns := make([]models.ParticipantCheckIn, len(req.Participants))
 	now := time.Now()
@@ -119,13 +138,6 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 	err = h.participantCheckinRepo.CreateBatch(checkIns)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get team details
-	team, err := h.teamRepo.GetByID(c.Request.Context(), req.TeamID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
 		return
 	}
 
@@ -405,9 +417,16 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 		return
 	}
 
-	// Group by team and filter out confirmed ones
+	// Group by team and filter out:
+	// - teams that are already confirmed
+	// - check-ins that do NOT belong to the currently logged-in volunteer
+	//   (so each table viewer only sees teams scanned by their own email/login)
 	teamMap := make(map[uuid.UUID][]models.ParticipantCheckIn)
 	for _, checkIn := range checkIns {
+		// Only consider rows created by this volunteer (email / login)
+		if checkIn.VolunteerID != volunteerID {
+			continue
+		}
 		teamMap[checkIn.TeamID] = append(teamMap[checkIn.TeamID], checkIn)
 	}
 
@@ -416,14 +435,21 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 		isConfirmed, _, _ := h.participantCheckinRepo.IsTeamConfirmed(teamID)
 		if !isConfirmed {
 			team, _ := h.teamRepo.GetByID(c.Request.Context(), teamID)
-			if team != nil {
-				pendingTeams = append(pendingTeams, gin.H{
-					"team":               team,
-					"participants":       participants,
-					"checked_in_at":      participants[0].CheckedInAt,
-					"participants_count": len(participants),
-				})
+			if team == nil {
+				continue
 			}
+
+			// Extra safety: ensure team location matches volunteer/table location
+			if team.City != nil && string(*team.City) != volunteer.City {
+				continue
+			}
+
+			pendingTeams = append(pendingTeams, gin.H{
+				"team":               team,
+				"participants":       participants,
+				"checked_in_at":      participants[0].CheckedInAt,
+				"participants_count": len(participants),
+			})
 		}
 	}
 

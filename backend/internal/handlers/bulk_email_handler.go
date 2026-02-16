@@ -40,7 +40,7 @@ func NewBulkEmailHandler(
 func (h *BulkEmailHandler) SendBulkEmail(c *gin.Context) {
 	var req models.SendEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
 		return
 	}
 
@@ -57,7 +57,11 @@ func (h *BulkEmailHandler) SendBulkEmail(c *gin.Context) {
 	}
 
 	if len(matchingTeams) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No teams match the specified filters"})
+		c.JSON(http.StatusOK, gin.H{
+			"message":          "No teams match the specified filters; no emails sent.",
+			"recipients_count": 0,
+			"teams_count":      0,
+		})
 		return
 	}
 
