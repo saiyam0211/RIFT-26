@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -91,18 +92,22 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 		return
 	}
 
-	// Get volunteer to get table_id
-	volunteer, err := h.volunteerRepo.GetByID(volunteerID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer info"})
+	// Get table_id from JWT (set during login when volunteer selects table)
+	sessionTableIDValue, tableExists := c.Get("session_table_id")
+	if !tableExists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No table selected. Please log in again and select a table."})
+		return
+	}
+	
+	sessionTableID, ok := sessionTableIDValue.(uuid.UUID)
+	if !ok || sessionTableID == uuid.Nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table selection. Please log in again."})
 		return
 	}
 
-	// Volunteer must be assigned to a table; otherwise the team will never appear in any table viewer
-	if volunteer.TableID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer not assigned to a table"})
-		return
-	}
+	// Get volunteer city from JWT for location validation
+	volunteerCity, _ := c.Get("city")
+	cityStr, _ := volunteerCity.(string)
 
 	// Get team details early to validate location (city) against volunteer/table city
 	team, err := h.teamRepo.GetByID(c.Request.Context(), req.TeamID)
@@ -112,12 +117,12 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 	}
 
 	// Ensure team city matches volunteer/table city (e.g. BLR/PUNE/etc.)
-	if team.City != nil && string(*team.City) != volunteer.City {
+	if cityStr != "" && team.City != nil && string(*team.City) != cityStr {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Team location does not match your table location"})
 		return
 	}
 
-	// Create participant check-ins
+	// Create participant check-ins using JWT table_id (from login session)
 	checkIns := make([]models.ParticipantCheckIn, len(req.Participants))
 	now := time.Now()
 
@@ -127,7 +132,7 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 			TeamID:          req.TeamID,
 			TeamMemberID:    participant.MemberID,
 			VolunteerID:     volunteerID,
-			TableID:         volunteer.TableID,
+			TableID:         &sessionTableID, // Use JWT table_id from login
 			ParticipantName: participant.Name,
 			ParticipantRole: participant.Role,
 			CheckedInAt:     now,
@@ -403,14 +408,31 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 		return
 	}
 
-	volunteer, err := h.volunteerRepo.GetByID(volunteerID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer info: " + err.Error()})
-		return
+	// Get volunteer city and table_id from JWT (set during login) - more reliable than DB lookup
+	volunteerCityValue, cityExists := c.Get("city")
+	volunteerCity := ""
+	if cityExists {
+		volunteerCity, _ = volunteerCityValue.(string)
 	}
 
-	// Query check-ins directly by volunteer_id (not table_id) - this ensures we get teams
-	// checked in by THIS specific volunteer/login, regardless of table assignment status
+	// Get session table_id from JWT (the table selected during login)
+	sessionTableIDValue, tableExists := c.Get("session_table_id")
+	var sessionTableID *uuid.UUID
+	if tableExists {
+		if tid, ok := sessionTableIDValue.(uuid.UUID); ok {
+			sessionTableID = &tid
+		}
+	}
+
+	// If city not in JWT, try to get from DB (fallback)
+	if volunteerCity == "" {
+		volunteer, err := h.volunteerRepo.GetByID(volunteerID)
+		if err == nil && volunteer != nil {
+			volunteerCity = volunteer.City
+		}
+	}
+
+	// Query check-ins by volunteer_id - this ensures we get teams checked in by THIS volunteer
 	since := time.Now().Add(-24 * time.Hour) // Last 24 hours
 	checkIns, err := h.participantCheckinRepo.GetByVolunteerID(volunteerID, 200) // Get recent check-ins
 	if err != nil {
@@ -418,12 +440,20 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 		return
 	}
 
-	// Filter by time window (since GetByVolunteerID doesn't support time filter)
+	// Filter by time window and table_id (if session table is set)
 	filteredCheckIns := make([]models.ParticipantCheckIn, 0)
 	for _, checkIn := range checkIns {
-		if checkIn.CheckedInAt.After(since) {
-			filteredCheckIns = append(filteredCheckIns, checkIn)
+		// Filter by time
+		if !checkIn.CheckedInAt.After(since) {
+			continue
 		}
+		// Filter by table_id if session table is set (volunteer selected a table during login)
+		if sessionTableID != nil {
+			if checkIn.TableID == nil || *checkIn.TableID != *sessionTableID {
+				continue // Skip check-ins for other tables
+			}
+		}
+		filteredCheckIns = append(filteredCheckIns, checkIn)
 	}
 
 	// Group by team (all check-ins are already for this volunteer)
@@ -435,18 +465,26 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 	// Build pending teams list (exclude confirmed ones)
 	pendingTeams := make([]gin.H, 0)
 	for teamID, participants := range teamMap {
-		isConfirmed, _, _ := h.participantCheckinRepo.IsTeamConfirmed(teamID)
+		isConfirmed, _, err := h.participantCheckinRepo.IsTeamConfirmed(teamID)
+		if err != nil {
+			// Log error but continue processing other teams
+			fmt.Printf("[GetPendingTeams] Error checking confirmation for team %v: %v\n", teamID, err)
+		}
 		if isConfirmed {
 			continue // Skip confirmed teams
 		}
 
 		team, err := h.teamRepo.GetByID(c.Request.Context(), teamID)
-		if err != nil || team == nil {
+		if err != nil {
+			fmt.Printf("[GetPendingTeams] Error fetching team %v: %v\n", teamID, err)
 			continue // Skip if team not found
+		}
+		if team == nil {
+			continue // Skip if team is nil
 		}
 
 		// Ensure team location matches volunteer city (if volunteer has city set)
-		if volunteer.City != "" && team.City != nil && string(*team.City) != volunteer.City {
+		if volunteerCity != "" && team.City != nil && string(*team.City) != volunteerCity {
 			continue // Skip teams from different cities
 		}
 

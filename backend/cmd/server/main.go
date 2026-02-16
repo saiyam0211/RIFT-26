@@ -151,8 +151,18 @@ func main() {
 			authRoutes.POST("/validate-rsvp-pin", middleware.RateLimitMiddleware(10, 1*time.Minute), rsvpPinHandler.ValidatePIN)
 		}
 
-		// Volunteer login (public)
+		// Volunteer routes (public login + table list)
 		v1.POST("/volunteer/login", volunteerAuthHandler.Login)
+		v1.GET("/volunteer/tables", func(c *gin.Context) {
+			// Public endpoint to get active tables for volunteer login selection
+			isActive := true
+			tables, err := eventTableRepo.GetAll(nil, &isActive)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "Failed to fetch tables"})
+				return
+			}
+			c.JSON(200, gin.H{"tables": tables})
+		})
 
 		// Volunteer routes (protected by volunteer auth)
 		volunteerRoutes := v1.Group("/volunteer")

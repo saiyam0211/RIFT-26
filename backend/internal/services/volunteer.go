@@ -22,7 +22,7 @@ func NewVolunteerService(repo *repository.VolunteerRepository) *VolunteerService
 }
 
 // Login authenticates a volunteer and returns a JWT token
-func (s *VolunteerService) Login(email, password string) (*models.VolunteerLoginResponse, error) {
+func (s *VolunteerService) Login(email, password string, sessionTableID *uuid.UUID) (*models.VolunteerLoginResponse, error) {
 	volunteer, err := s.repo.GetByEmail(email)
 	if err != nil {
 		return nil, fmt.Errorf("invalid credentials")
@@ -34,8 +34,8 @@ func (s *VolunteerService) Login(email, password string) (*models.VolunteerLogin
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	// Generate JWT token
-	token, err := s.generateToken(volunteer)
+	// Generate JWT token with session table_id (overrides DB table_id if provided)
+	token, err := s.generateToken(volunteer, sessionTableID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}
@@ -45,7 +45,8 @@ func (s *VolunteerService) Login(email, password string) (*models.VolunteerLogin
 		VolunteerID: volunteer.ID,
 		Action:      "login",
 		Details: map[string]interface{}{
-			"timestamp": time.Now(),
+			"timestamp":        time.Now(),
+			"session_table_id": sessionTableID,
 		},
 	})
 
@@ -56,7 +57,7 @@ func (s *VolunteerService) Login(email, password string) (*models.VolunteerLogin
 }
 
 // generateToken creates a JWT token for a volunteer
-func (s *VolunteerService) generateToken(volunteer *models.Volunteer) (string, error) {
+func (s *VolunteerService) generateToken(volunteer *models.Volunteer, sessionTableID *uuid.UUID) (string, error) {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "your-secret-key-change-in-production"
@@ -67,6 +68,7 @@ func (s *VolunteerService) generateToken(volunteer *models.Volunteer) (string, e
 	claims := jwt.MapClaims{
 		"user_id": volunteer.ID.String(), // Required by AuthMiddleware
 		"email":   volunteer.Email,
+		"city":    volunteer.City,
 		"role":    string(models.UserRoleVolunteer), // Must be "volunteer" string for models.UserRole
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
@@ -74,9 +76,15 @@ func (s *VolunteerService) generateToken(volunteer *models.Volunteer) (string, e
 		"iss":     "rift26-api",
 	}
 
-	// Add table info if assigned (for reference, but not used by standard Claims)
-	if volunteer.TableID != nil {
-		claims["table_id"] = volunteer.TableID.String()
+	// Use session table_id if provided (from login), otherwise use DB table_id
+	// This allows volunteers to select a table during login for this session
+	tableIDToUse := sessionTableID
+	if tableIDToUse == nil {
+		tableIDToUse = volunteer.TableID
+	}
+
+	if tableIDToUse != nil {
+		claims["table_id"] = tableIDToUse.String()
 	}
 	if volunteer.TableName != nil {
 		claims["table_name"] = *volunteer.TableName

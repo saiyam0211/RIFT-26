@@ -97,6 +97,9 @@ func ValidateJWT(tokenString, secret string) (*Claims, error) {
 			}
 		}
 		
+		// Note: table_id and city are in MapClaims but not in Claims struct
+		// They'll be extracted separately by middleware if needed
+		
 		return claims, nil
 	}
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/models"
 	"github.com/rift26/backend/internal/utils"
@@ -39,19 +40,39 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Debug Log
-		fmt.Printf("[AuthMiddleware] Success. UserID: %v, Role: %v, Email: %s\n", claims.UserID, claims.Role, claims.Email)
+	// Debug Log
+	fmt.Printf("[AuthMiddleware] Success. UserID: %v, Role: %v, Email: %s\n", claims.UserID, claims.Role, claims.Email)
 
-		// Set user info in context
-		c.Set("user_id", claims.UserID)
-		c.Set("role", claims.Role)
-		if claims.TeamID != nil {
-			c.Set("team_id", *claims.TeamID)
+	// Set user info in context
+	c.Set("user_id", claims.UserID)
+	c.Set("role", claims.Role)
+	if claims.TeamID != nil {
+		c.Set("team_id", *claims.TeamID)
+	}
+	c.Set("email", claims.Email)
+	c.Set("user_email", claims.Email) // Also set as user_email for compatibility
+
+	// Extract additional claims from raw token for volunteers (table_id, city)
+	// Re-parse as MapClaims to get volunteer-specific fields
+	rawToken := parts[1]
+	if mapToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	}); err == nil {
+		if mapClaims, ok := mapToken.Claims.(jwt.MapClaims); ok {
+			// Extract table_id from JWT (session-specific for volunteers)
+			if tableIDStr, ok := mapClaims["table_id"].(string); ok {
+				if tableID, err := uuid.Parse(tableIDStr); err == nil {
+					c.Set("session_table_id", tableID)
+				}
+			}
+			// Extract city
+			if city, ok := mapClaims["city"].(string); ok {
+				c.Set("city", city)
+			}
 		}
-		c.Set("email", claims.Email)
-		c.Set("user_email", claims.Email) // Also set as user_email for compatibility
+	}
 
-		c.Next()
+	c.Next()
 	}
 }
 

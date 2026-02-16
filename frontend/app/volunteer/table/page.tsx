@@ -53,17 +53,10 @@ export default function VolunteerTablePage() {
     const [allocating, setAllocating] = useState(false)
     const [allocationResult, setAllocationResult] = useState<{ block_name: string; room_name: string; seat_label: string } | null>(null)
 
-    // Real-time polling
+    // Initial load only - no auto-polling
     useEffect(() => {
         checkAuth()
         fetchPendingTeams()
-
-        // Poll every 3 seconds for real-time updates
-        const interval = setInterval(() => {
-            fetchPendingTeams()
-        }, 3000)
-
-        return () => clearInterval(interval)
     }, [])
 
     // Auto-show first pending team
@@ -88,6 +81,8 @@ export default function VolunteerTablePage() {
     }
 
     const fetchPendingTeams = async () => {
+        setLoading(true)
+        setError('')
         try {
             const token = localStorage.getItem('volunteer_token')
             if (!token) {
@@ -127,6 +122,7 @@ export default function VolunteerTablePage() {
                         statusText: response.statusText,
                         data: errData
                     })
+                    setError(errData.error || 'Failed to fetch teams')
                 }
                 return
             }
@@ -140,6 +136,7 @@ export default function VolunteerTablePage() {
             }))
         } catch (err) {
             console.error('Failed to fetch pending teams:', err)
+            setError('Failed to fetch teams. Please try again.')
         } finally {
             setLoading(false)
         }
@@ -291,6 +288,14 @@ export default function VolunteerTablePage() {
                                 </div>
                             </div>
                             <button
+                                onClick={fetchPendingTeams}
+                                disabled={loading}
+                                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-900 disabled:opacity-50 px-4 py-2 rounded-lg transition-all"
+                            >
+                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                                Refresh
+                            </button>
+                            <button
                                 onClick={handleLogout}
                                 className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg transition-all"
                             >
@@ -326,12 +331,13 @@ export default function VolunteerTablePage() {
                             <CheckCircle className="text-zinc-600" size={40} />
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-2">All Caught Up!</h2>
-                        <p className="text-zinc-400 mb-6">No pending teams. New check-ins will appear here automatically.</p>
+                        <p className="text-zinc-400 mb-6">No pending teams. Click refresh to check for new check-ins.</p>
                         <button
                             onClick={fetchPendingTeams}
-                            className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-lg transition"
+                            disabled={loading}
+                            className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-900 disabled:opacity-50 px-6 py-3 rounded-lg transition"
                         >
-                            <RefreshCw size={18} />
+                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                             Refresh
                         </button>
                     </div>
@@ -481,11 +487,6 @@ export default function VolunteerTablePage() {
                 )}
             </div>
 
-            {/* Auto-refresh indicator */}
-            <div className="fixed bottom-4 right-4 bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 text-xs text-zinc-400 flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Auto-refreshing
-            </div>
         </div>
     )
 }

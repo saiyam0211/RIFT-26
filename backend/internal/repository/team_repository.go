@@ -64,6 +64,7 @@ func (r *TeamRepository) SearchByName(ctx context.Context, teamName string) ([]m
 
 // GetByID retrieves a team with its members
 func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Team, error) {
+	// Use QueryRow instead of QueryRowContext to avoid prepared statement caching issues
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
 		       rsvp_locked, rsvp_locked_at, rsvp2_locked, rsvp2_locked_at, rsvp2_selected_members,
@@ -71,7 +72,7 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Tea
 		FROM teams WHERE id = $1
 	`
 	var team models.Team
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := r.db.QueryRow(query, id).Scan(
 		&team.ID, &team.TeamName, &team.City, &team.Status,
 		&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
 		&team.RSVPLockedAt, &team.RSVP2Locked, &team.RSVP2LockedAt, &team.RSVP2SelectedMembers,
@@ -97,6 +98,7 @@ func (r *TeamRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Tea
 
 // GetByQRToken retrieves a team by QR code token (for volunteer scanner)
 func (r *TeamRepository) GetByQRToken(ctx context.Context, token string) (*models.Team, error) {
+	// Use QueryRow instead of QueryRowContext to avoid prepared statement caching issues
 	query := `
 		SELECT id, team_name, city, status, problem_statement, qr_code_token,
 		       rsvp_locked, rsvp_locked_at, rsvp2_locked, rsvp2_locked_at, rsvp2_selected_members,
@@ -104,7 +106,7 @@ func (r *TeamRepository) GetByQRToken(ctx context.Context, token string) (*model
 		FROM teams WHERE qr_code_token = $1
 	`
 	var team models.Team
-	err := r.db.QueryRowContext(ctx, query, token).Scan(
+	err := r.db.QueryRow(query, token).Scan(
 		&team.ID, &team.TeamName, &team.City, &team.Status,
 		&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
 		&team.RSVPLockedAt, &team.RSVP2Locked, &team.RSVP2LockedAt, &team.RSVP2SelectedMembers,

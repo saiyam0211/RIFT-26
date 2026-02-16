@@ -24,6 +24,8 @@ func NewPostgresDB(databaseURL string) (*DB, error) {
 	// Set connection pool settings
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
+	// Disable prepared statement caching to avoid connection pooling issues
+	db.SetConnMaxLifetime(0) // Keep connections alive indefinitely
 
 	return &DB{db}, nil
 }
