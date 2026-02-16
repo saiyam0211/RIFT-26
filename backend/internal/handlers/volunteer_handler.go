@@ -404,53 +404,58 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 	}
 
 	volunteer, err := h.volunteerRepo.GetByID(volunteerID)
-	if err != nil || volunteer.TableID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer not assigned to a table"})
-		return
-	}
-
-	// Get recent check-ins for this table
-	since := time.Now().Add(-24 * time.Hour) // Last 24 hours
-	checkIns, err := h.participantCheckinRepo.GetByTableID(*volunteer.TableID, &since)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer info: " + err.Error()})
 		return
 	}
 
-	// Group by team and filter out:
-	// - teams that are already confirmed
-	// - check-ins that do NOT belong to the currently logged-in volunteer
-	//   (so each table viewer only sees teams scanned by their own email/login)
-	teamMap := make(map[uuid.UUID][]models.ParticipantCheckIn)
+	// Query check-ins directly by volunteer_id (not table_id) - this ensures we get teams
+	// checked in by THIS specific volunteer/login, regardless of table assignment status
+	since := time.Now().Add(-24 * time.Hour) // Last 24 hours
+	checkIns, err := h.participantCheckinRepo.GetByVolunteerID(volunteerID, 200) // Get recent check-ins
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch check-ins: " + err.Error()})
+		return
+	}
+
+	// Filter by time window (since GetByVolunteerID doesn't support time filter)
+	filteredCheckIns := make([]models.ParticipantCheckIn, 0)
 	for _, checkIn := range checkIns {
-		// Only consider rows created by this volunteer (email / login)
-		if checkIn.VolunteerID != volunteerID {
-			continue
+		if checkIn.CheckedInAt.After(since) {
+			filteredCheckIns = append(filteredCheckIns, checkIn)
 		}
+	}
+
+	// Group by team (all check-ins are already for this volunteer)
+	teamMap := make(map[uuid.UUID][]models.ParticipantCheckIn)
+	for _, checkIn := range filteredCheckIns {
 		teamMap[checkIn.TeamID] = append(teamMap[checkIn.TeamID], checkIn)
 	}
 
+	// Build pending teams list (exclude confirmed ones)
 	pendingTeams := make([]gin.H, 0)
 	for teamID, participants := range teamMap {
 		isConfirmed, _, _ := h.participantCheckinRepo.IsTeamConfirmed(teamID)
-		if !isConfirmed {
-			team, _ := h.teamRepo.GetByID(c.Request.Context(), teamID)
-			if team == nil {
-				continue
-			}
-
-			// Extra safety: ensure team location matches volunteer/table location
-			if team.City != nil && string(*team.City) != volunteer.City {
-				continue
-			}
-
-			pendingTeams = append(pendingTeams, gin.H{
-				"team":               team,
-				"participants":       participants,
-				"checked_in_at":      participants[0].CheckedInAt,
-				"participants_count": len(participants),
-			})
+		if isConfirmed {
+			continue // Skip confirmed teams
 		}
+
+		team, err := h.teamRepo.GetByID(c.Request.Context(), teamID)
+		if err != nil || team == nil {
+			continue // Skip if team not found
+		}
+
+		// Ensure team location matches volunteer city (if volunteer has city set)
+		if volunteer.City != "" && team.City != nil && string(*team.City) != volunteer.City {
+			continue // Skip teams from different cities
+		}
+
+		pendingTeams = append(pendingTeams, gin.H{
+			"team":               team,
+			"participants":       participants,
+			"checked_in_at":      participants[0].CheckedInAt,
+			"participants_count": len(participants),
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"pending_teams": pendingTeams})
