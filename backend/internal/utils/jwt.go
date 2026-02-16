@@ -55,7 +55,48 @@ func ValidateJWT(tokenString, secret string) (*Claims, error) {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
+	// Handle both Claims struct and MapClaims (for volunteer tokens)
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	// If token was created with MapClaims, extract and convert
+	if mapClaims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		claims := &Claims{}
+		
+		// Extract user_id
+		if userIDStr, ok := mapClaims["user_id"].(string); ok {
+			userID, err := uuid.Parse(userIDStr)
+			if err == nil {
+				claims.UserID = userID
+			}
+		}
+		
+		// Extract email
+		if email, ok := mapClaims["email"].(string); ok {
+			claims.Email = email
+		}
+		
+		// Extract role (critical for RoleMiddleware)
+		if roleStr, ok := mapClaims["role"].(string); ok {
+			claims.Role = models.UserRole(roleStr)
+		} else {
+			// Fallback: if role not found, try to infer from type or default to volunteer
+			if roleType, ok := mapClaims["type"].(string); ok && roleType == "volunteer" {
+				claims.Role = models.UserRoleVolunteer
+			} else {
+				claims.Role = models.UserRoleVolunteer // Default for volunteer tokens
+			}
+		}
+		
+		// Extract team_id if present
+		if teamIDStr, ok := mapClaims["team_id"].(string); ok {
+			teamID, err := uuid.Parse(teamIDStr)
+			if err == nil {
+				claims.TeamID = &teamID
+			}
+		}
+		
 		return claims, nil
 	}
 

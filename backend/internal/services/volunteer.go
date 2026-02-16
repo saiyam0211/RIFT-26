@@ -62,19 +62,19 @@ func (s *VolunteerService) generateToken(volunteer *models.Volunteer) (string, e
 		jwtSecret = "your-secret-key-change-in-production"
 	}
 
-	// Generate JWT token
-	// IMPORTANT: Adding 'user_id' and 'role' claims to satisfy AuthMiddleware and RoleMiddleware
+	// Use the standard Claims struct to ensure compatibility with ValidateJWT
+	// This ensures the role is properly typed as models.UserRole
 	claims := jwt.MapClaims{
-		"user_id":      volunteer.ID.String(), // Required by AuthMiddleware
-		"volunteer_id": volunteer.ID.String(), // Kept for specialized checks
-		"email":        volunteer.Email,
-		"city":         volunteer.City,
-		"role":         "volunteer", // Required by RoleMiddleware
-		"type":         "volunteer", // Kept for context
-		"exp":          time.Now().Add(24 * time.Hour).Unix(),
+		"user_id": volunteer.ID.String(), // Required by AuthMiddleware
+		"email":   volunteer.Email,
+		"role":    string(models.UserRoleVolunteer), // Must be "volunteer" string for models.UserRole
+		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+		"iat":     time.Now().Unix(),
+		"nbf":     time.Now().Unix(),
+		"iss":     "rift26-api",
 	}
 
-	// Add table info if assigned
+	// Add table info if assigned (for reference, but not used by standard Claims)
 	if volunteer.TableID != nil {
 		claims["table_id"] = volunteer.TableID.String()
 	}
