@@ -41,6 +41,9 @@ export default function VolunteerScannerPage() {
     const [allocating, setAllocating] = useState<string | null>(null)
     const [confirming, setConfirming] = useState<string | null>(null)
     const [allocationResult, setAllocationResult] = useState<Record<string, any>>({})
+    const [showBlockModal, setShowBlockModal] = useState(false)
+    const [allocateTeamId, setAllocateTeamId] = useState<string | null>(null)
+    const [selectedBlock, setSelectedBlock] = useState<string>('')
     const [volunteerInfo, setVolunteerInfo] = useState<any>(null)
     const [justCheckedIn, setJustCheckedIn] = useState(false) // Track if team was just checked in
     const scannerRef = useRef<Html5QrcodeScanner | null>(null)
@@ -303,11 +306,27 @@ export default function VolunteerScannerPage() {
         }
     }
 
-    const handleAllocateSeat = async (teamId: string) => {
+    const BLOCK_OPTIONS = [
+        { value: 'A (17th Floor)', label: 'Block A (17th Floor)' },
+        { value: 'B (12th Floor)', label: 'Block B (12th Floor)' },
+    ]
+
+    const openBlockModal = (teamId: string) => {
+        setAllocateTeamId(teamId)
+        setSelectedBlock('')
+        setShowBlockModal(true)
+        setError('')
+    }
+
+    const handleAllocateSeat = async (teamId: string, blockName?: string) => {
         setAllocating(teamId)
         setError('')
+        setShowBlockModal(false)
+        setAllocateTeamId(null)
         try {
-            const response = await apiClient.post('/table/allocate-seat', { team_id: teamId })
+            const body: { team_id: string; block_name?: string } = { team_id: teamId }
+            if (blockName) body.block_name = blockName
+            const response = await apiClient.post('/table/allocate-seat', body)
             // Handle both "already allocated" and "newly allocated" responses
             const allocationData = {
                 block_name: response.data.block_name,
@@ -483,7 +502,7 @@ export default function VolunteerScannerPage() {
                                     <div className="flex gap-2">
                                         {isBengaluru && !allocationResult[pending.team.id] && !pending.seat_allocation && (
                                             <button
-                                                onClick={() => handleAllocateSeat(pending.team.id)}
+                                                onClick={() => openBlockModal(pending.team.id)}
                                                 disabled={allocating === pending.team.id}
                                                 className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
                                             >
@@ -676,7 +695,7 @@ export default function VolunteerScannerPage() {
                                 {/* Show allocate seat button for BLR right after check-in (only if not already allocated) */}
                                 {isBengaluru && !allocationResult[scannedTeam.id] && (
                                     <button
-                                        onClick={() => handleAllocateSeat(scannedTeam.id)}
+                                        onClick={() => openBlockModal(scannedTeam.id)}
                                         disabled={allocating === scannedTeam.id}
                                         className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg"
                                     >
@@ -729,6 +748,53 @@ export default function VolunteerScannerPage() {
                     </div>
                 )}
             </div>
+
+            {/* Block selection modal (Bengaluru – allocate seat) */}
+            {showBlockModal && allocateTeamId && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl md:rounded-3xl w-full md:max-w-md overflow-hidden">
+                        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-white">Select block for seat allocation</h3>
+                            <button
+                                onClick={() => { setShowBlockModal(false); setAllocateTeamId(null); setSelectedBlock(''); }}
+                                className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-zinc-400">Choose the block where you want to allocate the seat. If the block is full, a seat will be allocated in another block.</p>
+                            <div className="grid grid-cols-1 gap-2">
+                                {BLOCK_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setSelectedBlock(opt.value)}
+                                        className={`text-left p-4 rounded-xl border-2 transition-all font-medium ${selectedBlock === opt.value ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-600'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => { setShowBlockModal(false); setAllocateTeamId(null); setSelectedBlock(''); }}
+                                    className="flex-1 py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => selectedBlock && handleAllocateSeat(allocateTeamId, selectedBlock)}
+                                    disabled={!selectedBlock || allocating === allocateTeamId}
+                                    className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold"
+                                >
+                                    {allocating === allocateTeamId ? 'Allocating...' : 'Allocate Seat'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* History Modal */}
             {showHistory && (

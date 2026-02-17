@@ -293,9 +293,11 @@ func (h *VolunteerHandler) ConfirmTable(c *gin.Context) {
 
 // AllocateSeat allocates a Bengaluru seat to a team (table volunteer).
 // POST /api/v1/table/allocate-seat
+// Body: team_id (required), block_name (optional) — e.g. "A (17th Floor)" or "B (12th Floor)". If block is full, allocates in another block.
 func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
 	var req struct {
-		TeamID uuid.UUID `json:"team_id" binding:"required"`
+		TeamID    uuid.UUID `json:"team_id" binding:"required"`
+		BlockName string    `json:"block_name"` // optional: volunteer's preferred block
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -324,21 +326,10 @@ func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
 		return
 	}
 
-	// Decide preferred block based on leader email domain
-	var leaderEmail string
-	for _, m := range team.Members {
-		if m.Role == models.RoleLeader {
-			leaderEmail = strings.ToLower(strings.TrimSpace(m.Email))
-			break
-		}
-	}
-
+	// Use volunteer's chosen block if provided; otherwise no preference (any block)
 	var preferredBlockName *string
-	if leaderEmail != "" && strings.HasSuffix(leaderEmail, "@pwioi.com") {
-		block := "A (17th Floor)"
-		preferredBlockName = &block
-	} else {
-		block := "B (12th Floor)"
+	if strings.TrimSpace(req.BlockName) != "" {
+		block := strings.TrimSpace(req.BlockName)
 		preferredBlockName = &block
 	}
 

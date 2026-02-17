@@ -47,7 +47,11 @@ func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.
 		return nil, errors.New("no participants checked in for this team")
 	}
 
+	// Try preferred block first; if full or no seats, try any block
 	seats, err := s.findBestAvailableSeats(tx, teamSize, preferredBlockName)
+	if err != nil && preferredBlockName != nil && *preferredBlockName != "" {
+		seats, err = s.findBestAvailableSeats(tx, teamSize, nil)
+	}
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("no available seats: %w", err)
