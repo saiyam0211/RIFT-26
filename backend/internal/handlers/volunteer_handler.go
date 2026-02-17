@@ -57,6 +57,14 @@ func (h *VolunteerHandler) ScanQR(c *gin.Context) {
 		return
 	}
 
+	// Enforce that team has completed Final Confirmation (RSVP2) before scanning is allowed
+	if !team.RSVP2Locked || team.Status != models.StatusRSVP2Done {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "This team has not completed Final Confirmation (RSVP2). They are not eligible for check-in.",
+		})
+		return
+	}
+
 	// Get participants already checked in (if any)
 	var participantsCheckedIn []models.ParticipantCheckIn
 	if isCheckedIn {
@@ -97,9 +105,9 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 	volunteerCity, _ := c.Get("city")
 	cityStr, _ := volunteerCity.(string)
 
-	// Get team details early to validate location (city) against volunteer city
+	// Get team details early to validate location (city) and eligibility
 	team, err := h.teamRepo.GetByID(c.Request.Context(), req.TeamID)
-	if err != nil {
+	if err != nil || team == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
 		return
 	}
@@ -107,6 +115,22 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 	// Ensure team city matches volunteer city (e.g. BLR/PUNE/etc.)
 	if cityStr != "" && team.City != nil && string(*team.City) != cityStr {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Team location does not match your location"})
+		return
+	}
+
+	// Enforce Final Confirmation completed (RSVP2) for any check-in
+	if !team.RSVP2Locked || team.Status != models.StatusRSVP2Done {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "This team has not completed Final Confirmation (RSVP2). You cannot check in this team.",
+		})
+		return
+	}
+
+	// At least 2 participants must be selected for check-in
+	if len(req.Participants) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "At least 2 participants must be selected to check in a team.",
+		})
 		return
 	}
 
@@ -300,6 +324,24 @@ func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
 		return
 	}
 
+	// Decide preferred block based on leader email domain
+	var leaderEmail string
+	for _, m := range team.Members {
+		if m.Role == models.RoleLeader {
+			leaderEmail = strings.ToLower(strings.TrimSpace(m.Email))
+			break
+		}
+	}
+
+	var preferredBlockName *string
+	if leaderEmail != "" && strings.HasSuffix(leaderEmail, "@pwioi.com") {
+		block := "A (17th Floor)"
+		preferredBlockName = &block
+	} else {
+		block := "B (12th Floor)"
+		preferredBlockName = &block
+	}
+
 	// Check if seat already allocated - return existing allocation instead of error
 	existingAllocation, err := h.seatAllocationService.GetTeamAllocation(req.TeamID)
 	if err == nil && existingAllocation != nil {
@@ -313,7 +355,7 @@ func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
 		return
 	}
 
-	allocation, err := h.seatAllocationService.AllocateSeat(req.TeamID, volunteerID)
+	allocation, err := h.seatAllocationService.AllocateSeat(req.TeamID, volunteerID, preferredBlockName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

@@ -20,7 +20,7 @@ func NewSeatAllocationService(db *gorm.DB) *SeatAllocationService {
 
 // AllocateSeat allocates a seat (or group of seats for teams of 2/3/4) to a team.
 // Teams of 2/3/4 are allocated only to merged seats marked for that team size.
-func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.UUID) (*models.SeatAllocation, error) {
+func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.UUID, preferredBlockName *string) (*models.SeatAllocation, error) {
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -47,7 +47,7 @@ func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.
 		return nil, errors.New("no participants checked in for this team")
 	}
 
-	seats, err := s.findBestAvailableSeats(tx, teamSize)
+	seats, err := s.findBestAvailableSeats(tx, teamSize, preferredBlockName)
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("no available seats: %w", err)
@@ -105,24 +105,30 @@ func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.
 }
 
 // baseJoin returns a fresh query chain for Bengaluru seat lookups (do not reuse; GORM has no Clone).
-func baseJoin(tx *gorm.DB) *gorm.DB {
-	return tx.Model(&models.Seat{}).
+func baseJoin(tx *gorm.DB, preferredBlockName *string) *gorm.DB {
+	query := tx.Model(&models.Seat{}).
 		Joins("JOIN rooms ON rooms.id = seats.room_id").
 		Joins("JOIN blocks ON blocks.id = rooms.block_id").
 		Where("seats.is_available = ? AND seats.is_active = ? AND rooms.is_active = ? AND blocks.is_active = ?",
 			true, true, true, true).
 		Where("blocks.city = ?", "bengaluru")
+
+	if preferredBlockName != nil && *preferredBlockName != "" {
+		query = query.Where("blocks.name = ?", *preferredBlockName)
+	}
+
+	return query
 }
 
 // findBestAvailableSeats returns one or more seats (a group) for the given team size.
 // Teams of 2, 3, or 4: only seats with matching team_size_preference and same seat_group_id (all available).
 // Team of 1: single seat with team_size_preference IS NULL (or unset).
-func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int) ([]*models.Seat, error) {
+func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int, preferredBlockName *string) ([]*models.Seat, error) {
 	if teamSize >= 2 && teamSize <= 4 {
 		// Strict: only merged groups of exactly this team size (all seats in group available).
 		// Order: 1st block, 1st room, then row A (row 1), 1st column — deterministic, not random.
 		var candidates []models.Seat
-		err := baseJoin(tx).
+		err := baseJoin(tx, preferredBlockName).
 			Where("seats.team_size_preference = ? AND seats.seat_group_id IS NOT NULL", teamSize).
 			Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
 			Find(&candidates).Error
@@ -176,12 +182,12 @@ func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int
 
 	// Team of 1: single seat, prefer no team_size_preference (solo seat)
 	var seat models.Seat
-	err := baseJoin(tx).
+	err := baseJoin(tx, preferredBlockName).
 		Where("seats.team_size_preference IS NULL").
 		Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
 		First(&seat).Error
 	if err != nil {
-		err = baseJoin(tx).
+		err = baseJoin(tx, preferredBlockName).
 			Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
 			First(&seat).Error
 	}

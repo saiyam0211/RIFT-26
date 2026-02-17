@@ -201,7 +201,11 @@ export default function VolunteerScannerPage() {
     }
 
     const handleCheckIn = async () => {
-        if (!scannedTeam || selectedParticipants.size === 0) return
+        if (!scannedTeam) return
+        if (selectedParticipants.size < 2) {
+            setError('At least 2 participants must be selected to check in a team.')
+            return
+        }
         setProcessing(true)
         setError('')
 
@@ -654,7 +658,7 @@ export default function VolunteerScannerPage() {
                             <div className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950 border-t border-zinc-800">
                                 <button
                                     onClick={handleCheckIn}
-                                    disabled={processing || selectedParticipants.size === 0}
+                                    disabled={processing || selectedParticipants.size < 2}
                                     className="w-full bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-bold py-4 px-6 rounded-xl transition-all active:scale-[0.98] text-lg"
                                 >
                                     {processing ? (
