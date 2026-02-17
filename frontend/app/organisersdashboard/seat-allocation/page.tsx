@@ -149,7 +149,9 @@ export default function SeatAllocationPage() {
     const [canvasCols, setCanvasCols] = useState(22)
     const isDraggingRef = useRef(false)
     const [viewMode, setViewMode] = useState<'build' | 'view'>('build')
-    const [roomViewData, setRoomViewData] = useState<{ layout: { rows: number; cols: number; cells: Record<string, string>; groups: any[] } | null; allocations: { team_id: string; team_name: string; seat_label: string; positions: { row: number; col: number }[] }[] } | null>(null)
+    const [roomViewData, setRoomViewData] = useState<{ room_name?: string; layout: { rows: number; cols: number; cells: Record<string, string>; groups: any[] } | null; allocations: { team_id: string; team_name: string; seat_label: string; positions: { row: number; col: number }[] }[] } | null>(null)
+    const [hoveredAlloc, setHoveredAlloc] = useState<{ team_id: string; team_name: string; seat_label: string; positions: { row: number; col: number }[] } | null>(null)
+    const [selectedAlloc, setSelectedAlloc] = useState<{ team_id: string; team_name: string; seat_label: string; positions: { row: number; col: number }[] } | null>(null)
     const [highlightTeamIds, setHighlightTeamIds] = useState<Set<string>>(new Set())
     const [roomDashboardData, setRoomDashboardData] = useState<Record<string, {
         teams2: number;
@@ -364,6 +366,7 @@ export default function SeatAllocationPage() {
         try {
             const res = await axios.get(`${API}/admin/seat-allocation/rooms/${selectedRoomId}/room-view`, { headers: { Authorization: `Bearer ${token}` } })
             setRoomViewData({
+                room_name: res.data?.room_name,
                 layout: res.data?.layout ? { 
                     rows: res.data.layout.rows || canvasRows, 
                     cols: res.data.layout.cols || canvasCols, 
@@ -372,6 +375,8 @@ export default function SeatAllocationPage() {
                 } : null,
                 allocations: res.data?.allocations || []
             })
+            setHoveredAlloc(null)
+            setSelectedAlloc(null)
             setViewMode('view')
         } catch (e) {
             console.error(e)
@@ -1156,7 +1161,29 @@ export default function SeatAllocationPage() {
                     {viewMode === 'view' && roomViewData && (
                         <div className="mt-8 p-6 bg-zinc-950 rounded-xl border border-zinc-700">
                             <h3 className="text-lg font-semibold text-white mb-2">Room view — allocated teams</h3>
-                            <p className="text-zinc-400 text-sm mb-4">Merged cells show team name. Select teams below to highlight them and dim others.</p>
+                            <p className="text-zinc-400 text-sm mb-4">Merged cells show team name. Hover or click a cell to see full team details. Select teams below to highlight.</p>
+                            {/* Hover tooltip */}
+                            {hoveredAlloc && (
+                                <div className="mb-3 p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg text-left">
+                                    <p className="text-amber-200 font-semibold text-sm">Team: {hoveredAlloc.team_name}</p>
+                                    <p className="text-zinc-300 text-xs mt-1">Seat: {hoveredAlloc.seat_label}</p>
+                                    {roomViewData?.room_name && <p className="text-zinc-400 text-xs">Room: {roomViewData.room_name}</p>}
+                                </div>
+                            )}
+                            {/* Click-selected details card */}
+                            {selectedAlloc && (
+                                <div className="mb-3 p-4 bg-zinc-800 border border-amber-500/50 rounded-xl text-left flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-white font-bold">Team: {selectedAlloc.team_name}</p>
+                                        <p className="text-zinc-300 text-sm mt-1">Seat: {selectedAlloc.seat_label}</p>
+                                        {roomViewData?.room_name && <p className="text-zinc-400 text-sm mt-0.5">Room: {roomViewData.room_name}</p>}
+                                        <p className="text-zinc-500 text-xs mt-2">Team size: {selectedAlloc.positions?.length || 1} seat(s)</p>
+                                    </div>
+                                    <button type="button" onClick={() => setSelectedAlloc(null)} className="p-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-300" aria-label="Close">
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            )}
                             {roomViewData.allocations.length > 0 && (
                                 <div className="flex flex-wrap items-center gap-2 mb-4">
                                     <span className="text-zinc-400 text-sm">Highlight:</span>
@@ -1282,17 +1309,27 @@ export default function SeatAllocationPage() {
                                                     const maxC = Math.max(...positions.map((p: any) => p.col))
                                                     const highlight = highlightTeamIds.size === 0 || highlightTeamIds.has(a.team_id)
                                                     const dim = highlightTeamIds.size > 0 && !highlightTeamIds.has(a.team_id)
+                                                    const isSelected = selectedAlloc?.team_id === a.team_id
                                                     
                                                     return (
                                                         <div
                                                             key={`alloc-${a.team_id}`}
-                                                            className={`flex items-center justify-center rounded-lg border-2 font-semibold text-xs text-center overflow-hidden ${highlight ? 'bg-amber-500/95 text-black border-amber-400 ring-2 ring-amber-300' : 'bg-amber-500/80 text-black border-amber-600'} ${dim ? 'opacity-30' : ''}`}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            onMouseEnter={() => setHoveredAlloc(a)}
+                                                            onMouseLeave={() => setHoveredAlloc(null)}
+                                                            onClick={() => setSelectedAlloc(prev => prev?.team_id === a.team_id ? null : a)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedAlloc(prev => prev?.team_id === a.team_id ? null : a); } }}
+                                                            className={`flex items-center justify-center rounded-lg border-2 font-semibold text-xs text-center overflow-hidden cursor-pointer transition-all ${highlight ? 'bg-amber-500/95 text-black border-amber-400' : 'bg-amber-500/80 text-black border-amber-600'} ${dim ? 'opacity-30' : ''} ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-900' : 'hover:ring-2 hover:ring-amber-300'}`}
                                                             style={{
                                                                 gridRow: `${minR} / ${maxR + 1}`,
                                                                 gridColumn: `${minC} / ${maxC + 1}`,
                                                             }}
+                                                            title={`${a.team_name || 'Team'} — Seat: ${a.seat_label}${roomViewData?.room_name ? ` — Room: ${roomViewData.room_name}` : ''}`}
                                                         >
-                                                            <span className="truncate px-1">{a.team_name || a.seat_label}</span>
+                                                            <span className="truncate px-1 block w-full text-[11px] sm:text-xs font-bold leading-tight">
+                                                                {(a.team_name || a.seat_label || '—').length > 10 ? (a.team_name || a.seat_label || '—').slice(0, 10) + '…' : (a.team_name || a.seat_label || '—')}
+                                                            </span>
                                                         </div>
                                                     )
                                                 })}

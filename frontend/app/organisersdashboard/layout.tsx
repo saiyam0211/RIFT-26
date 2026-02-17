@@ -13,7 +13,8 @@ import {
     LogOut,
     User,
     Table,
-    MapPin
+    MapPin,
+    ShieldCheck
 } from 'lucide-react';
 import { getAdminToken, getAdminUser, removeAdminToken } from '../../src/lib/admin-auth';
 
@@ -51,6 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Tickets', path: '/organisersdashboard/tickets', icon: Ticket },
         { name: 'Announcements', path: '/organisersdashboard/announcements', icon: Megaphone },
         { name: 'Emails', path: '/organisersdashboard/emails', icon: Mail },
+        { name: 'Volunteer Admins', path: '/organisersdashboard/volunteer-admins', icon: ShieldCheck },
     ];
 
     return (

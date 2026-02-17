@@ -5,7 +5,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode'
 import apiClient from '@/lib/api-client'
 import { Team, TeamMember } from '@/types'
 import { useRouter } from 'next/navigation'
-import { X, History, Check, RotateCcw, LogOut, Users, CheckCircle2 } from 'lucide-react'
+import { X, History, Check, RotateCcw, LogOut, Users, CheckCircle2, MapPin, RefreshCw } from 'lucide-react'
 
 interface ParticipantCheckIn {
     id: string
@@ -36,15 +36,30 @@ export default function VolunteerScannerPage() {
     const [showHistory, setShowHistory] = useState(false)
     const [history, setHistory] = useState<CheckInHistory[]>([])
     const [stats, setStats] = useState({ total: 0, checkedIn: 0 })
+    const [pendingTeams, setPendingTeams] = useState<any[]>([])
+    const [loadingPending, setLoadingPending] = useState(false)
+    const [allocating, setAllocating] = useState<string | null>(null)
+    const [confirming, setConfirming] = useState<string | null>(null)
+    const [allocationResult, setAllocationResult] = useState<Record<string, any>>({})
+    const [volunteerInfo, setVolunteerInfo] = useState<any>(null)
+    const [justCheckedIn, setJustCheckedIn] = useState(false) // Track if team was just checked in
     const scannerRef = useRef<Html5QrcodeScanner | null>(null)
 
     useEffect(() => {
         // Check volunteer authentication
         const token = localStorage.getItem('volunteer_token')
+        const volunteerData = localStorage.getItem('volunteer_user')
         if (!token) {
             router.push('/volunteer/login')
             return
         }
+
+        if (volunteerData) {
+            setVolunteerInfo(JSON.parse(volunteerData))
+        }
+
+        // Fetch pending teams on mount
+        fetchPendingTeams()
 
         let isMounted = true;
 
@@ -200,6 +215,8 @@ export default function VolunteerScannerPage() {
             })
 
             setSuccess(`✅ ${participants.length} participant(s) checked in successfully!`)
+            setJustCheckedIn(true) // Mark that this team was just checked in
+            setAlreadyCheckedIn(true) // Mark as checked in so action buttons appear
 
             // Play success sound (optional)
             if (typeof window !== 'undefined' && 'vibrate' in navigator) {
@@ -212,10 +229,11 @@ export default function VolunteerScannerPage() {
                 checkedIn: prev.checkedIn + 1
             }))
 
-            // Reset after 2 seconds
-            setTimeout(() => {
-                resetScanner()
-            }, 2000)
+            // Refresh pending teams to show the newly checked-in team
+            await fetchPendingTeams()
+
+            // Don't auto-reset - let user see the team and allocate seat if needed
+            // Reset scanner will be manual or after allocation
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to check in participants')
         } finally {
@@ -246,16 +264,96 @@ export default function VolunteerScannerPage() {
         }
     }
 
+    const fetchPendingTeams = async () => {
+        setLoadingPending(true)
+        try {
+            const response = await apiClient.get('/table/pending')
+            setPendingTeams(response.data.pending_teams || [])
+        } catch (err: any) {
+            console.error('Failed to fetch pending teams:', err)
+        } finally {
+            setLoadingPending(false)
+        }
+    }
+
+    const handleAllocateSeat = async (teamId: string) => {
+        setAllocating(teamId)
+        setError('')
+        try {
+            const response = await apiClient.post('/table/allocate-seat', { team_id: teamId })
+            // Handle both "already allocated" and "newly allocated" responses
+            const allocationData = {
+                block_name: response.data.block_name,
+                room_name: response.data.room_name,
+                seat_label: response.data.seat_label,
+                team_size: response.data.team_size
+            }
+            setAllocationResult({
+                ...allocationResult,
+                [teamId]: allocationData
+            })
+            const message = response.data.message === 'Seat already allocated' 
+                ? `Seat already allocated: ${allocationData.block_name} → ${allocationData.room_name} → ${allocationData.seat_label}`
+                : `Seat allocated successfully! (Team size: ${allocationData.team_size})`
+            setSuccess(message)
+            setTimeout(() => setSuccess(''), 3000)
+            // Refresh pending teams to update the UI
+            await fetchPendingTeams()
+        } catch (err: any) {
+            const errorMsg = err.response?.data?.error || 'Failed to allocate seat'
+            // If error mentions "already allocated", try to fetch existing allocation
+            if (errorMsg.includes('already') || errorMsg.includes('duplicate')) {
+                setError('Seat already allocated. Refreshing...')
+                await fetchPendingTeams()
+                setTimeout(() => setError(''), 2000)
+            } else {
+                setError(errorMsg)
+            }
+        } finally {
+            setAllocating(null)
+        }
+    }
+
+    const handleMarkAsDone = async (teamId: string) => {
+        setConfirming(teamId)
+        setError('')
+        try {
+            await apiClient.post('/table/confirm', { team_id: teamId })
+            setSuccess('Team marked as done!')
+            // Remove from pending list
+            setPendingTeams(prev => prev.filter(t => t.team.id !== teamId))
+            setTimeout(() => setSuccess(''), 2000)
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to mark as done')
+        } finally {
+            setConfirming(null)
+        }
+    }
+
     const handleLogout = () => {
         localStorage.removeItem('volunteer_token')
         localStorage.removeItem('volunteer_user')
         router.push('/volunteer/login')
     }
 
+    // Normalize city for comparison (handle different formats)
+    const normalizeCity = (city: string | undefined) => {
+        if (!city) return ''
+        const cityLower = city.toLowerCase().trim()
+        if (cityLower === 'bangalore' || cityLower === 'bengaluru' || cityLower === 'blr') {
+            return 'BLR'
+        }
+        return city.toUpperCase()
+    }
+    
+    const volunteerCityNormalized = normalizeCity(volunteerInfo?.city)
+    const isBengaluru = volunteerCityNormalized === 'BLR'
+
     const resetScanner = () => {
         setScannedTeam(null)
         setSelectedParticipants(new Set<string>())
         setAlreadyCheckedIn(false)
+        setJustCheckedIn(false)
         setParticipantsCheckedIn([])
         setError('')
         setSuccess('')
@@ -302,7 +400,7 @@ export default function VolunteerScannerPage() {
             </div>
 
             {/* Stats */}
-            <div className="px-4 py-4 grid grid-cols-2 gap-3">
+            <div className="px-4 py-4 grid grid-cols-3 gap-3">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                     <p className="text-zinc-500 text-xs mb-1">Total Scanned</p>
                     <p className="text-2xl font-bold text-white">{stats.total}</p>
@@ -311,7 +409,89 @@ export default function VolunteerScannerPage() {
                     <p className="text-zinc-500 text-xs mb-1">Checked In</p>
                     <p className="text-2xl font-bold text-green-400">{stats.checkedIn}</p>
                 </div>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                    <p className="text-zinc-500 text-xs mb-1">Pending</p>
+                    <p className="text-2xl font-bold text-orange-400">{pendingTeams.length}</p>
+                </div>
             </div>
+
+            {/* Pending Teams */}
+            {pendingTeams.length > 0 && (
+                <div className="px-4 mb-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold text-white">Pending Teams</h2>
+                            <button
+                                onClick={fetchPendingTeams}
+                                disabled={loadingPending}
+                                className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition"
+                            >
+                                <RefreshCw size={18} className={loadingPending ? 'animate-spin' : ''} />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            {pendingTeams.map((pending) => (
+                                <div key={pending.team.id} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-white mb-1">{pending.team.team_name}</h3>
+                                            <p className="text-xs text-zinc-400">
+                                                {pending.participants_count} participants • {new Date(pending.checked_in_at).toLocaleTimeString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    {allocationResult[pending.team.id] && (
+                                        <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/50 rounded-lg">
+                                            <p className="text-xs text-emerald-400 font-medium mb-2">✓ Seat Allocated — tell team:</p>
+                                            <p className="text-sm font-semibold text-white">Block: {allocationResult[pending.team.id].block_name}</p>
+                                            <p className="text-sm font-semibold text-white">Room: {allocationResult[pending.team.id].room_name}</p>
+                                            <p className="text-sm font-semibold text-white">Seat: {allocationResult[pending.team.id].seat_label}</p>
+                                            {allocationResult[pending.team.id].team_size && (
+                                                <p className="text-xs text-zinc-400 mt-1">Team size: {allocationResult[pending.team.id].team_size}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2">
+                                        {isBengaluru && !allocationResult[pending.team.id] && !pending.seat_allocation && (
+                                            <button
+                                                onClick={() => handleAllocateSeat(pending.team.id)}
+                                                disabled={allocating === pending.team.id}
+                                                className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
+                                            >
+                                                <MapPin size={16} />
+                                                {allocating === pending.team.id ? 'Allocating...' : 'Allocate Seat'}
+                                            </button>
+                                        )}
+                                        
+                                        {/* Show existing seat allocation from backend */}
+                                        {pending.seat_allocation && !allocationResult[pending.team.id] && (
+                                            <div className="flex-1 p-3 bg-emerald-500/10 border border-emerald-500/50 rounded-lg">
+                                                <p className="text-xs text-emerald-400 font-medium mb-1">✓ Seat Already Allocated</p>
+                                                <p className="text-sm font-semibold text-white">Block: {pending.seat_allocation.block_name}</p>
+                                                <p className="text-sm font-semibold text-white">Room: {pending.seat_allocation.room_name}</p>
+                                                <p className="text-sm font-semibold text-white">Seat: {pending.seat_allocation.seat_label}</p>
+                                                {pending.seat_allocation.team_size && (
+                                                    <p className="text-xs text-zinc-400 mt-1">Team size: {pending.seat_allocation.team_size}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={() => handleMarkAsDone(pending.team.id)}
+                                            disabled={confirming === pending.team.id}
+                                            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            <CheckCircle2 size={16} />
+                                            {confirming === pending.team.id ? 'Processing...' : 'Mark as Done'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="px-4">
@@ -440,11 +620,57 @@ export default function VolunteerScannerPage() {
                             </div>
                         )}
 
-                        {alreadyCheckedIn && (
-                            <div className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950 border-t border-zinc-800">
+                        {/* After successful check-in, show action buttons */}
+                        {(justCheckedIn || alreadyCheckedIn) && scannedTeam && (
+                            <div className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-950 border-t border-zinc-800 space-y-2">
+                                {/* Show allocate seat button for BLR right after check-in (only if not already allocated) */}
+                                {isBengaluru && !allocationResult[scannedTeam.id] && (
+                                    <button
+                                        onClick={() => handleAllocateSeat(scannedTeam.id)}
+                                        disabled={allocating === scannedTeam.id}
+                                        className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg"
+                                    >
+                                        <MapPin size={20} />
+                                        {allocating === scannedTeam.id ? 'Allocating Seat...' : 'Allocate Seat'}
+                                    </button>
+                                )}
+                                
+                                {/* Show seat allocation result if allocated */}
+                                {allocationResult[scannedTeam.id] && (
+                                    <div className="mb-2 p-4 bg-emerald-500/10 border border-emerald-500/50 rounded-lg">
+                                        <p className="text-xs text-emerald-400 font-medium mb-2">✓ Seat Allocated — tell the team:</p>
+                                        <p className="text-base font-semibold text-white mb-1">Block: {allocationResult[scannedTeam.id].block_name}</p>
+                                        <p className="text-base font-semibold text-white mb-1">Room: {allocationResult[scannedTeam.id].room_name}</p>
+                                        <p className="text-base font-semibold text-white">Seat: {allocationResult[scannedTeam.id].seat_label}</p>
+                                        {allocationResult[scannedTeam.id].team_size && (
+                                            <p className="text-xs text-zinc-400 mt-2">Team size: {allocationResult[scannedTeam.id].team_size} participants</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Mark as Done button */}
                                 <button
-                                    onClick={resetScanner}
-                                    className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-4 px-6 rounded-xl transition-all active:scale-[0.98] text-lg"
+                                    onClick={async () => {
+                                        await handleMarkAsDone(scannedTeam.id)
+                                        setTimeout(() => {
+                                            resetScanner()
+                                            setJustCheckedIn(false)
+                                        }, 2000)
+                                    }}
+                                    disabled={confirming === scannedTeam.id}
+                                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg"
+                                >
+                                    <CheckCircle2 size={20} />
+                                    {confirming === scannedTeam.id ? 'Processing...' : 'Mark as Done'}
+                                </button>
+
+                                {/* Scan Next button */}
+                                <button
+                                    onClick={() => {
+                                        resetScanner()
+                                        setJustCheckedIn(false)
+                                    }}
+                                    className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-3 px-6 rounded-xl transition-all"
                                 >
                                     Scan Next Team
                                 </button>

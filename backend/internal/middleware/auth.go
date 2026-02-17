@@ -52,19 +52,13 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	c.Set("email", claims.Email)
 	c.Set("user_email", claims.Email) // Also set as user_email for compatibility
 
-	// Extract additional claims from raw token for volunteers (table_id, city)
+	// Extract additional claims from raw token for volunteers (city)
 	// Re-parse as MapClaims to get volunteer-specific fields
 	rawToken := parts[1]
 	if mapToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
 		return []byte(jwtSecret), nil
 	}); err == nil {
 		if mapClaims, ok := mapToken.Claims.(jwt.MapClaims); ok {
-			// Extract table_id from JWT (session-specific for volunteers)
-			if tableIDStr, ok := mapClaims["table_id"].(string); ok {
-				if tableID, err := uuid.Parse(tableIDStr); err == nil {
-					c.Set("session_table_id", tableID)
-				}
-			}
 			// Extract city
 			if city, ok := mapClaims["city"].(string); ok {
 				c.Set("city", city)

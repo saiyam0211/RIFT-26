@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -405,34 +406,168 @@ func (h *SeatAllocatorHandler) GetRoomView(c *gin.Context) {
 		return
 	}
 
-	// Group by team_id: each team has name and list of positions (row, col)
+	// One allocation row per team: get positions from single seat or full seat group
 	type teamAlloc struct {
-		TeamID   string     `json:"team_id"`
-		TeamName string     `json:"team_name"`
-		SeatLabel string   `json:"seat_label"`
+		TeamID    string `json:"team_id"`
+		TeamName  string `json:"team_name"`
+		SeatLabel string `json:"seat_label"`
 		Positions []struct{ Row int `json:"row"`; Col int `json:"col"` } `json:"positions"`
 	}
-	byTeam := make(map[uuid.UUID]*teamAlloc)
-	for _, a := range allocations {
-		if byTeam[a.TeamID] == nil {
-			ta := &teamAlloc{TeamID: a.TeamID.String(), SeatLabel: a.SeatLabel}
-			if a.Team != nil {
-				ta.TeamName = a.Team.TeamName
-			}
-			byTeam[a.TeamID] = ta
-		}
-		if a.Seat != nil {
-			byTeam[a.TeamID].Positions = append(byTeam[a.TeamID].Positions, struct{ Row int `json:"row"`; Col int `json:"col"` }{a.Seat.RowNumber, a.Seat.ColumnNumber})
-		}
-	}
 	var teamAllocs []*teamAlloc
-	for _, ta := range byTeam {
+	for _, a := range allocations {
+		ta := &teamAlloc{TeamID: a.TeamID.String()}
+		if a.Team != nil {
+			ta.TeamName = a.Team.TeamName
+		}
+		// SeatLabel: use denormalized if set, else build from seat(s)
+		if a.Seat != nil {
+			ta.SeatLabel = a.Seat.SeatLabel
+			var seats []models.Seat
+			if a.Seat.SeatGroupID != nil {
+				_ = h.db.Where("room_id = ? AND seat_group_id = ?", a.RoomID, *a.Seat.SeatGroupID).
+					Order("row_number ASC, column_number ASC").
+					Find(&seats).Error
+			}
+			if len(seats) == 0 {
+				seats = []models.Seat{*a.Seat}
+			}
+			for _, s := range seats {
+				ta.Positions = append(ta.Positions, struct{ Row int `json:"row"`; Col int `json:"col"` }{s.RowNumber, s.ColumnNumber})
+			}
+			if len(seats) > 1 {
+				combined := seats[0].SeatLabel
+				for i := 1; i < len(seats); i++ {
+					combined += "-" + seats[i].SeatLabel
+				}
+				ta.SeatLabel = combined
+			}
+		}
 		teamAllocs = append(teamAllocs, ta)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"room_id":     room.ID,
 		"room_name":   room.Name,
+		"layout":      layout,
+		"allocations": teamAllocs,
+	})
+}
+
+// slug normalizes a string for URL matching: lowercase, spaces to hyphens
+func slug(s string) string {
+	return strings.ToLower(strings.TrimSpace(strings.ReplaceAll(s, " ", "-")))
+}
+
+// GetPublicRoomView returns layout and allocations for a room by city and room name (slug).
+// Public, no auth. For now only city "bengaluru" is supported.
+// GET /api/v1/public/viewroom/:city/:roomname
+func (h *SeatAllocatorHandler) GetPublicRoomView(c *gin.Context) {
+	cityParam := strings.ToLower(strings.TrimSpace(c.Param("city")))
+	roomnameParam := strings.TrimSpace(c.Param("roomname"))
+	if roomnameParam == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "room name required"})
+		return
+	}
+	// Only Bengaluru supported for now
+	if cityParam != "bengaluru" && cityParam != "blr" && cityParam != "bangalore" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "city not found or not supported"})
+		return
+	}
+
+	// Match Bengaluru blocks: exact match or city containing bengaluru/bangalore
+	var blocks []models.Block
+	if err := h.db.Where(
+		"LOWER(TRIM(city)) IN ? OR LOWER(TRIM(city)) LIKE ? OR LOWER(TRIM(city)) LIKE ?",
+		[]string{"bengaluru", "blr", "bangalore"},
+		"%bengaluru%", "%bangalore%",
+	).Find(&blocks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to find blocks"})
+		return
+	}
+	if len(blocks) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no blocks found for this city"})
+		return
+	}
+	blockIDs := make([]uuid.UUID, len(blocks))
+	for i := range blocks {
+		blockIDs[i] = blocks[i].ID
+	}
+
+	var rooms []models.Room
+	if err := h.db.Preload("Block").Where("block_id IN ?", blockIDs).Find(&rooms).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find rooms"})
+		return
+	}
+	targetSlug := slug(roomnameParam)
+	var room models.Room
+	var found bool
+	for i := range rooms {
+		// Match by slug (e.g. "robotics-lab" for "Robotics Lab") or exact name (e.g. "1" for "1")
+		if slug(rooms[i].Name) == targetSlug || strings.TrimSpace(rooms[i].Name) == roomnameParam {
+			room = rooms[i]
+			found = true
+			break
+		}
+	}
+	if !found || room.ID == uuid.Nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "room not found"})
+		return
+	}
+
+	var layout interface{}
+	if len(room.LayoutJSON) > 0 {
+		_ = json.Unmarshal(room.LayoutJSON, &layout)
+	}
+
+	var allocations []models.SeatAllocation
+	if err := h.db.Preload("Team").Preload("Seat").
+		Where("room_id = ?", room.ID).
+		Find(&allocations).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch allocations"})
+		return
+	}
+
+	type teamAlloc struct {
+		TeamID    string `json:"team_id"`
+		TeamName  string `json:"team_name"`
+		SeatLabel string `json:"seat_label"`
+		Positions []struct{ Row int `json:"row"`; Col int `json:"col"` } `json:"positions"`
+	}
+	var teamAllocs []*teamAlloc
+	for _, a := range allocations {
+		ta := &teamAlloc{TeamID: a.TeamID.String()}
+		if a.Team != nil {
+			ta.TeamName = a.Team.TeamName
+		}
+		if a.Seat != nil {
+			ta.SeatLabel = a.Seat.SeatLabel
+			var seats []models.Seat
+			if a.Seat.SeatGroupID != nil {
+				_ = h.db.Where("room_id = ? AND seat_group_id = ?", a.RoomID, *a.Seat.SeatGroupID).
+					Order("row_number ASC, column_number ASC").
+					Find(&seats).Error
+			}
+			if len(seats) == 0 {
+				seats = []models.Seat{*a.Seat}
+			}
+			for _, s := range seats {
+				ta.Positions = append(ta.Positions, struct{ Row int `json:"row"`; Col int `json:"col"` }{s.RowNumber, s.ColumnNumber})
+			}
+			if len(seats) > 1 {
+				combined := seats[0].SeatLabel
+				for i := 1; i < len(seats); i++ {
+					combined += "-" + seats[i].SeatLabel
+				}
+				ta.SeatLabel = combined
+			}
+		}
+		teamAllocs = append(teamAllocs, ta)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"room_id":     room.ID,
+		"room_name":   room.Name,
+		"block_name":  func() string { if room.Block != nil { return room.Block.Name }; return "" }(),
 		"layout":      layout,
 		"allocations": teamAllocs,
 	})

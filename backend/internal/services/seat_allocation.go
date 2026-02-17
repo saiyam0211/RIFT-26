@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/models"
@@ -74,38 +75,33 @@ func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.
 		return nil, fmt.Errorf("failed to update room occupancy: %w", err)
 	}
 
-	// Build combined label for display (e.g. "A1-A2")
+	// Build combined label for display (e.g. "A1-A2" or "A1-A2-A3")
 	combinedLabel := seats[0].SeatLabel
 	for i := 1; i < len(seats); i++ {
 		combinedLabel += "-" + seats[i].SeatLabel
 	}
 
-	var firstAlloc *models.SeatAllocation
-	for i, seat := range seats {
-		alloc := &models.SeatAllocation{
-			TeamID:      teamID,
-			SeatID:      seat.ID,
-			BlockID:     room.BlockID,
-			RoomID:      seat.RoomID,
-			AllocatedBy: volunteerID,
-			TeamSize:    teamSize,
-			BlockName:   room.Block.Name,
-			RoomName:    room.Name,
-			SeatLabel:   combinedLabel,
-		}
-		if err := tx.Create(alloc).Error; err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("failed to create allocation: %w", err)
-		}
-		if i == 0 {
-			firstAlloc = alloc
-		}
+	// Schema has UNIQUE(team_id): create only ONE row per team (first seat in group).
+	alloc := &models.SeatAllocation{
+		TeamID:      teamID,
+		SeatID:      seats[0].ID,
+		BlockID:     room.BlockID,
+		RoomID:      seats[0].RoomID,
+		AllocatedBy: volunteerID,
+		TeamSize:    teamSize,
+		BlockName:   room.Block.Name,
+		RoomName:    room.Name,
+		SeatLabel:   combinedLabel,
+	}
+	if err := tx.Create(alloc).Error; err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to create allocation: %w", err)
 	}
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	return firstAlloc, nil
+	return alloc, nil
 }
 
 // baseJoin returns a fresh query chain for Bengaluru seat lookups (do not reuse; GORM has no Clone).
@@ -123,16 +119,17 @@ func baseJoin(tx *gorm.DB) *gorm.DB {
 // Team of 1: single seat with team_size_preference IS NULL (or unset).
 func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int) ([]*models.Seat, error) {
 	if teamSize >= 2 && teamSize <= 4 {
-		// Strict: only merged groups of exactly this team size (all seats in group available)
+		// Strict: only merged groups of exactly this team size (all seats in group available).
+		// Order: 1st block, 1st room, then row A (row 1), 1st column — deterministic, not random.
 		var candidates []models.Seat
 		err := baseJoin(tx).
 			Where("seats.team_size_preference = ? AND seats.seat_group_id IS NOT NULL", teamSize).
-			Order("blocks.display_order ASC, rooms.display_order ASC, seats.seat_group_id ASC, seats.row_number ASC, seats.column_number ASC").
+			Order("blocks.display_order ASC, rooms.display_order ASC, seats.row_number ASC, seats.column_number ASC").
 			Find(&candidates).Error
 		if err != nil || len(candidates) == 0 {
 			return nil, errors.New("no available seats for this team size")
 		}
-		// Group by seat_group_id; return first group that has exactly teamSize and all available
+		// Group by seat_group_id
 		byGroup := make(map[uuid.UUID][]*models.Seat)
 		for i := range candidates {
 			if candidates[i].SeatGroupID == nil {
@@ -141,7 +138,18 @@ func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int
 			gid := *candidates[i].SeatGroupID
 			byGroup[gid] = append(byGroup[gid], &candidates[i])
 		}
-		for _, groupSeats := range byGroup {
+		// Consider groups in the same order as candidates (1st block, 1st room, row A, col 1 first)
+		seenGroup := make(map[uuid.UUID]bool)
+		for i := range candidates {
+			if candidates[i].SeatGroupID == nil {
+				continue
+			}
+			gid := *candidates[i].SeatGroupID
+			if seenGroup[gid] {
+				continue
+			}
+			seenGroup[gid] = true
+			groupSeats := byGroup[gid]
 			if len(groupSeats) != teamSize {
 				continue
 			}
@@ -153,6 +161,13 @@ func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int
 				}
 			}
 			if allAvail {
+				// Return seats in row-then-column order (A row, 1st column first)
+				sort.Slice(groupSeats, func(i, j int) bool {
+					if groupSeats[i].RowNumber != groupSeats[j].RowNumber {
+						return groupSeats[i].RowNumber < groupSeats[j].RowNumber
+					}
+					return groupSeats[i].ColumnNumber < groupSeats[j].ColumnNumber
+				})
 				return groupSeats, nil
 			}
 		}
@@ -180,10 +195,8 @@ func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int
 func (s *SeatAllocationService) getTeamSize(tx *gorm.DB, teamID uuid.UUID) (int, error) {
 	var count int64
 
-	// Count checked-in participants
-	err := tx.Model(&models.ParticipantCheckIn{}).
-		Where("team_id = ?", teamID).
-		Count(&count).Error
+	// Count checked-in participants using raw SQL (ParticipantCheckIn is not a GORM model)
+	err := tx.Raw("SELECT COUNT(*) FROM participant_check_ins WHERE team_id = ?", teamID).Scan(&count).Error
 
 	if err != nil {
 		return 0, err
@@ -215,6 +228,19 @@ func (s *SeatAllocationService) GetTeamAllocation(teamID uuid.UUID) (*models.Sea
 	}
 	if allocation.Seat != nil {
 		allocation.SeatLabel = allocation.Seat.SeatLabel
+		// If seat is part of a group, build combined label from all seats in group
+		if allocation.Seat.SeatGroupID != nil {
+			var groupSeats []models.Seat
+			if err := s.db.Where("room_id = ? AND seat_group_id = ?", allocation.RoomID, *allocation.Seat.SeatGroupID).
+				Order("row_number ASC, column_number ASC").
+				Find(&groupSeats).Error; err == nil && len(groupSeats) > 0 {
+				combined := groupSeats[0].SeatLabel
+				for i := 1; i < len(groupSeats); i++ {
+					combined += "-" + groupSeats[i].SeatLabel
+				}
+				allocation.SeatLabel = combined
+			}
+		}
 	}
 
 	return &allocation, nil
@@ -244,25 +270,64 @@ func (s *SeatAllocationService) GetAllocationStats() (map[string]interface{}, er
 	s.db.Model(&models.SeatAllocation{}).Select("COALESCE(SUM(team_size), 0)").Scan(&totalParticipants)
 	stats["total_participants_allocated"] = totalParticipants
 
-	// Per-room stats
-	type RoomStat struct {
-		BlockName        string
-		RoomName         string
-		Capacity         int
-		CurrentOccupancy int
-		AvailableSeats   int64
+	// Teams by size (2, 3, 4 participants)
+	teamsBySize := map[string]int64{"2": 0, "3": 0, "4": 0}
+	for _, size := range []int{2, 3, 4} {
+		var c int64
+		s.db.Model(&models.SeatAllocation{}).Where("team_size = ?", size).Count(&c)
+		teamsBySize[fmt.Sprint(size)] = c
 	}
-	var roomStats []RoomStat
+	stats["teams_by_size"] = teamsBySize
+
+	// How many more teams of 2/3/4 can be accommodated: count full available seat groups per team size
+	availableSlots := map[string]int64{"2": 0, "3": 0, "4": 0}
+	for _, size := range []int{2, 3, 4} {
+		var c int64
+		// Groups where all seats in the group are available and group size matches
+		s.db.Raw(`
+			SELECT COUNT(*) FROM (
+				SELECT seat_group_id FROM seats
+				WHERE seat_group_id IS NOT NULL AND team_size_preference = ? AND is_active = true
+				GROUP BY seat_group_id
+				HAVING COUNT(*) = ? AND SUM(CASE WHEN is_available THEN 1 ELSE 0 END) = ?
+			) t
+		`, size, size, size).Scan(&c)
+		availableSlots[fmt.Sprint(size)] = c
+	}
+	stats["available_slots_by_team_size"] = availableSlots
+
+	// Per-room stats: block, room name, capacity, occupied (from actual allocations), available (Bengaluru only)
+	// Occupied = SUM(team_size) from seat_allocations for that room (avoids stale rooms.current_occupancy)
+	type RoomStatRow struct {
+		BlockName      string
+		RoomName       string
+		Capacity       int
+		Occupancy      int
+		AvailableSeats int64
+	}
+	var roomStatRows []RoomStatRow
 
 	s.db.Model(&models.Room{}).
-		Select("blocks.name as block_name, rooms.name as room_name, rooms.capacity, rooms.current_occupancy, COUNT(seats.id) FILTER (WHERE seats.is_available = true) as available_seats").
+		Select("blocks.name as block_name, rooms.name as room_name, rooms.capacity, (SELECT COALESCE(SUM(team_size), 0) FROM seat_allocations WHERE room_id = rooms.id) as occupancy, COUNT(seats.id) FILTER (WHERE seats.is_available = true) as available_seats").
 		Joins("JOIN blocks ON blocks.id = rooms.block_id").
 		Joins("LEFT JOIN seats ON seats.room_id = rooms.id AND seats.is_active = true").
 		Where("rooms.is_active = ? AND blocks.is_active = ?", true, true).
-		Group("blocks.name, rooms.name, rooms.capacity, rooms.current_occupancy").
+		Where("LOWER(TRIM(blocks.city)) IN (?, ?, ?)", "bengaluru", "blr", "bangalore").
+		Group("rooms.id, blocks.name, rooms.name, rooms.capacity, blocks.display_order, rooms.display_order").
 		Order("blocks.display_order, rooms.display_order").
-		Scan(&roomStats)
+		Scan(&roomStatRows)
 
+	// Normalize for JSON (snake_case) so frontend can rely on one format
+	roomStats := make([]map[string]interface{}, 0, len(roomStatRows))
+	for _, r := range roomStatRows {
+		roomStats = append(roomStats, map[string]interface{}{
+			"block_name":      r.BlockName,
+			"room_name":      r.RoomName,
+			"capacity":       r.Capacity,
+			"current_occupancy": r.Occupancy,
+			"available_seats": r.AvailableSeats,
+		})
+	}
 	stats["room_stats"] = roomStats
 
 	return stats, nil

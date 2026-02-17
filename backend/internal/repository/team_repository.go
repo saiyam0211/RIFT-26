@@ -764,3 +764,13 @@ func (r *TeamRepository) UpdateRSVP2(ctx context.Context, teamID uuid.UUID, sele
 
 	return nil
 }
+
+// UpdateTeamStatus updates a team's status field
+func (r *TeamRepository) UpdateTeamStatus(ctx context.Context, teamID uuid.UUID, status models.TeamStatus) error {
+	query := `UPDATE teams SET status = $1, updated_at = NOW() WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, string(status), teamID)
+	if err != nil {
+		return fmt.Errorf("failed to update team status: %w", err)
+	}
+	return nil
+}

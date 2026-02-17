@@ -128,6 +128,9 @@ export default function VolunteerTablePage() {
             }
 
             const data = await response.json()
+            console.log('[Table Viewer] Response data:', data)
+            console.log('[Table Viewer] Pending teams:', data.pending_teams)
+            console.log('[Table Viewer] Pending teams count:', data.pending_teams?.length || 0)
             setPendingTeams(data.pending_teams || [])
             setError('') // Clear error on success
             setStats(prev => ({
@@ -450,22 +453,35 @@ export default function VolunteerTablePage() {
 
                                         {/* Action Buttons */}
                                         <div className="flex flex-col gap-3">
-                                            <div className="flex gap-4">
-                                                <button
-                                                    onClick={handleAllocateSeat}
-                                                    disabled={allocating || !!allocationResult}
-                                                    className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <MapPin size={20} />
-                                                    {allocating ? 'Allocating...' : allocationResult ? 'Seat allocated' : 'Allocate seat'}
-                                                </button>
+                                            {/* Check if volunteer is from Bengaluru - show seat allocation only for BLR */}
+                                            {(volunteerInfo?.city === 'BLR' || volunteerInfo?.city === 'bengaluru') && (
+                                                <div className="flex gap-4">
+                                                    <button
+                                                        onClick={handleAllocateSeat}
+                                                        disabled={allocating || !!allocationResult}
+                                                        className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <MapPin size={20} />
+                                                        {allocating ? 'Allocating...' : allocationResult ? 'Seat allocated' : 'Allocate seat'}
+                                                    </button>
+                                                    <button
+                                                        onClick={handleSkip}
+                                                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
+                                                    >
+                                                        Skip for Now
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {/* For non-BLR cities, show Skip button without Allocate Seat */}
+                                            {volunteerInfo?.city !== 'BLR' && volunteerInfo?.city !== 'bengaluru' && (
                                                 <button
                                                     onClick={handleSkip}
-                                                    className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
+                                                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
                                                 >
                                                     Skip for Now
                                                 </button>
-                                            </div>
+                                            )}
+                                            {/* Mark as Done button - available for all cities */}
                                             <button
                                                 onClick={handleConfirm}
                                                 disabled={processing}

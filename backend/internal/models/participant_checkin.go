@@ -45,6 +45,29 @@ type CheckInResponse struct {
 	Message               string               `json:"message"`
 }
 
+// CheckedInTeam is used for volunteer-admin dashboard: one row per checked-in team with size, room, table, and volunteer.
+type CheckedInTeam struct {
+	TeamID           uuid.UUID  `json:"team_id"`
+	TeamName         string     `json:"team_name"`
+	TeamSize         int        `json:"team_size"`
+	RoomName         *string    `json:"room_name,omitempty"`   // from seat_allocations if allocated (Bengaluru)
+	TableName        *string    `json:"table_name,omitempty"`  // event table/counter from volunteer who checked in (volunteers are table-specific)
+	VolunteerEmail   string     `json:"volunteer_email"`       // volunteer who checked in this team
+	LatestCheckInAt  time.Time  `json:"latest_checkin_at"`
+}
+
+// CheckInWithDetails is used for volunteer-admin dashboard: check-in with volunteer email and team name.
+type CheckInWithDetails struct {
+	ID              uuid.UUID `json:"id"`
+	TeamID          uuid.UUID `json:"team_id"`
+	VolunteerID     uuid.UUID `json:"volunteer_id"`
+	ParticipantName string    `json:"participant_name"`
+	ParticipantRole string    `json:"participant_role"`
+	CheckedInAt     time.Time `json:"checked_in_at"`
+	VolunteerEmail  string    `json:"volunteer_email"`
+	TeamName        string    `json:"team_name"`
+}
+
 // CheckInHistoryResponse represents the check-in history for a volunteer
 type CheckInHistoryResponse struct {
 	CheckIns []struct {

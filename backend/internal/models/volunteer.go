@@ -34,9 +34,8 @@ type VolunteerLog struct {
 
 // VolunteerLoginRequest represents the login request payload
 type VolunteerLoginRequest struct {
-	Email   string     `json:"email" binding:"required,email"`
-	Password string     `json:"password" binding:"required"`
-	TableID  *uuid.UUID `json:"table_id"` // Optional: volunteer selects table during login
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
 }
 
 // VolunteerLoginResponse represents the login response

@@ -22,7 +22,7 @@ func NewVolunteerService(repo *repository.VolunteerRepository) *VolunteerService
 }
 
 // Login authenticates a volunteer and returns a JWT token
-func (s *VolunteerService) Login(email, password string, sessionTableID *uuid.UUID) (*models.VolunteerLoginResponse, error) {
+func (s *VolunteerService) Login(email, password string) (*models.VolunteerLoginResponse, error) {
 	volunteer, err := s.repo.GetByEmail(email)
 	if err != nil {
 		return nil, fmt.Errorf("invalid credentials")
@@ -34,8 +34,8 @@ func (s *VolunteerService) Login(email, password string, sessionTableID *uuid.UU
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	// Generate JWT token with session table_id (overrides DB table_id if provided)
-	token, err := s.generateToken(volunteer, sessionTableID)
+	// Generate JWT token (no table_id needed)
+	token, err := s.generateToken(volunteer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}
@@ -45,8 +45,7 @@ func (s *VolunteerService) Login(email, password string, sessionTableID *uuid.UU
 		VolunteerID: volunteer.ID,
 		Action:      "login",
 		Details: map[string]interface{}{
-			"timestamp":        time.Now(),
-			"session_table_id": sessionTableID,
+			"timestamp": time.Now(),
 		},
 	})
 
@@ -57,7 +56,7 @@ func (s *VolunteerService) Login(email, password string, sessionTableID *uuid.UU
 }
 
 // generateToken creates a JWT token for a volunteer
-func (s *VolunteerService) generateToken(volunteer *models.Volunteer, sessionTableID *uuid.UUID) (string, error) {
+func (s *VolunteerService) generateToken(volunteer *models.Volunteer) (string, error) {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "your-secret-key-change-in-production"
@@ -74,20 +73,6 @@ func (s *VolunteerService) generateToken(volunteer *models.Volunteer, sessionTab
 		"iat":     time.Now().Unix(),
 		"nbf":     time.Now().Unix(),
 		"iss":     "rift26-api",
-	}
-
-	// Use session table_id if provided (from login), otherwise use DB table_id
-	// This allows volunteers to select a table during login for this session
-	tableIDToUse := sessionTableID
-	if tableIDToUse == nil {
-		tableIDToUse = volunteer.TableID
-	}
-
-	if tableIDToUse != nil {
-		claims["table_id"] = tableIDToUse.String()
-	}
-	if volunteer.TableName != nil {
-		claims["table_name"] = *volunteer.TableName
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

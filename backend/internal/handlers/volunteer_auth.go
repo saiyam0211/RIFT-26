@@ -26,7 +26,7 @@ func (h *VolunteerAuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	response, err := h.service.Login(req.Email, req.Password, req.TableID)
+	response, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return

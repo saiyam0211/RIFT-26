@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,11 +16,11 @@ import (
 )
 
 type VolunteerHandler struct {
-	checkinService          *services.CheckinService
-	participantCheckinRepo  *repository.ParticipantCheckInRepository
-	teamRepo                *repository.TeamRepository
-	volunteerRepo           *repository.VolunteerRepository
-	seatAllocationService   *services.SeatAllocationService
+	checkinService         *services.CheckinService
+	participantCheckinRepo *repository.ParticipantCheckInRepository
+	teamRepo               *repository.TeamRepository
+	volunteerRepo          *repository.VolunteerRepository
+	seatAllocationService  *services.SeatAllocationService
 }
 
 func NewVolunteerHandler(
@@ -92,37 +93,24 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 		return
 	}
 
-	// Get table_id from JWT (set during login when volunteer selects table)
-	sessionTableIDValue, tableExists := c.Get("session_table_id")
-	if !tableExists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No table selected. Please log in again and select a table."})
-		return
-	}
-	
-	sessionTableID, ok := sessionTableIDValue.(uuid.UUID)
-	if !ok || sessionTableID == uuid.Nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table selection. Please log in again."})
-		return
-	}
-
 	// Get volunteer city from JWT for location validation
 	volunteerCity, _ := c.Get("city")
 	cityStr, _ := volunteerCity.(string)
 
-	// Get team details early to validate location (city) against volunteer/table city
+	// Get team details early to validate location (city) against volunteer city
 	team, err := h.teamRepo.GetByID(c.Request.Context(), req.TeamID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
 		return
 	}
 
-	// Ensure team city matches volunteer/table city (e.g. BLR/PUNE/etc.)
+	// Ensure team city matches volunteer city (e.g. BLR/PUNE/etc.)
 	if cityStr != "" && team.City != nil && string(*team.City) != cityStr {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Team location does not match your table location"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team location does not match your location"})
 		return
 	}
 
-	// Create participant check-ins using JWT table_id (from login session)
+	// Create participant check-ins without table_id (table concept removed)
 	checkIns := make([]models.ParticipantCheckIn, len(req.Participants))
 	now := time.Now()
 
@@ -132,7 +120,7 @@ func (h *VolunteerHandler) CheckInParticipants(c *gin.Context) {
 			TeamID:          req.TeamID,
 			TeamMemberID:    participant.MemberID,
 			VolunteerID:     volunteerID,
-			TableID:         &sessionTableID, // Use JWT table_id from login
+			TableID:         nil, // No table_id - table concept removed
 			ParticipantName: participant.Name,
 			ParticipantRole: participant.Role,
 			CheckedInAt:     now,
@@ -238,7 +226,7 @@ func (h *VolunteerHandler) UndoCheckIn(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Check-in undone successfully"})
 }
 
-// ConfirmTable marks a team as confirmed by table volunteer
+// ConfirmTable marks a team as confirmed by volunteer (mark as done)
 // POST /api/v1/table/confirm
 func (h *VolunteerHandler) ConfirmTable(c *gin.Context) {
 	var req struct {
@@ -256,16 +244,18 @@ func (h *VolunteerHandler) ConfirmTable(c *gin.Context) {
 		return
 	}
 
-	volunteer, err := h.volunteerRepo.GetByID(volunteerID)
+	// Update team status to checked_in
+	err := h.teamRepo.UpdateTeamStatus(c.Request.Context(), req.TeamID, models.StatusCheckedIn)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer info"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update team status: " + err.Error()})
 		return
 	}
 
+	// Create confirmation record (no table_id - table concept removed)
 	confirmation := &models.TableConfirmation{
 		TeamID:      req.TeamID,
 		VolunteerID: volunteerID,
-		TableID:     volunteer.TableID,
+		TableID:     nil, // No table_id - table concept removed
 	}
 
 	err = h.participantCheckinRepo.CreateTableConfirmation(confirmation)
@@ -294,8 +284,32 @@ func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
 		return
 	}
 
+	// Verify team is from Bengaluru (seat allocation only available for BLR)
+	team, err := h.teamRepo.GetByID(c.Request.Context(), req.TeamID)
+	if err != nil || team == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team not found"})
+		return
+	}
+	if team.City == nil || string(*team.City) != "BLR" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Seat allocation only available for Bengaluru teams"})
+		return
+	}
+
 	if h.seatAllocationService == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Seat allocation not configured"})
+		return
+	}
+
+	// Check if seat already allocated - return existing allocation instead of error
+	existingAllocation, err := h.seatAllocationService.GetTeamAllocation(req.TeamID)
+	if err == nil && existingAllocation != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message":    "Seat already allocated",
+			"block_name": existingAllocation.BlockName,
+			"room_name":  existingAllocation.RoomName,
+			"seat_label": existingAllocation.SeatLabel,
+			"team_size":  existingAllocation.TeamSize,
+		})
 		return
 	}
 
@@ -306,11 +320,11 @@ func (h *VolunteerHandler) AllocateSeat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "Seat allocated successfully",
-		"block_name":   allocation.BlockName,
-		"room_name":    allocation.RoomName,
-		"seat_label":   allocation.SeatLabel,
-		"team_size":    allocation.TeamSize,
+		"message":    "Seat allocated successfully",
+		"block_name": allocation.BlockName,
+		"room_name":  allocation.RoomName,
+		"seat_label": allocation.SeatLabel,
+		"team_size":  allocation.TeamSize,
 	})
 }
 
@@ -399,7 +413,7 @@ func (h *VolunteerHandler) GetVolunteerLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"logs": logs})
 }
 
-// GetPendingTeams gets teams checked in but not yet confirmed by table volunteer
+// GetPendingTeams gets teams checked in by this volunteer but not yet confirmed
 // GET /api/v1/table/pending
 func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 	volunteerID, exists := middleware.GetUserID(c)
@@ -408,20 +422,11 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 		return
 	}
 
-	// Get volunteer city and table_id from JWT (set during login) - more reliable than DB lookup
+	// Get volunteer city from JWT (set during login) - more reliable than DB lookup
 	volunteerCityValue, cityExists := c.Get("city")
 	volunteerCity := ""
 	if cityExists {
 		volunteerCity, _ = volunteerCityValue.(string)
-	}
-
-	// Get session table_id from JWT (the table selected during login)
-	sessionTableIDValue, tableExists := c.Get("session_table_id")
-	var sessionTableID *uuid.UUID
-	if tableExists {
-		if tid, ok := sessionTableIDValue.(uuid.UUID); ok {
-			sessionTableID = &tid
-		}
 	}
 
 	// If city not in JWT, try to get from DB (fallback)
@@ -432,35 +437,31 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 		}
 	}
 
-	// Query check-ins by volunteer_id - this ensures we get teams checked in by THIS volunteer
+	// Query check-ins by volunteer_id (no table concept - each volunteer sees their own check-ins)
 	since := time.Now().Add(-24 * time.Hour) // Last 24 hours
-	checkIns, err := h.participantCheckinRepo.GetByVolunteerID(volunteerID, 200) // Get recent check-ins
+	checkIns, err := h.participantCheckinRepo.GetByVolunteerID(volunteerID, 200)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch check-ins: " + err.Error()})
 		return
 	}
 
-	// Filter by time window and table_id (if session table is set)
+	// Filter by time window
 	filteredCheckIns := make([]models.ParticipantCheckIn, 0)
 	for _, checkIn := range checkIns {
-		// Filter by time
-		if !checkIn.CheckedInAt.After(since) {
-			continue
+		if checkIn.CheckedInAt.After(since) {
+			filteredCheckIns = append(filteredCheckIns, checkIn)
 		}
-		// Filter by table_id if session table is set (volunteer selected a table during login)
-		if sessionTableID != nil {
-			if checkIn.TableID == nil || *checkIn.TableID != *sessionTableID {
-				continue // Skip check-ins for other tables
-			}
-		}
-		filteredCheckIns = append(filteredCheckIns, checkIn)
 	}
 
-	// Group by team (all check-ins are already for this volunteer)
+	fmt.Printf("[GetPendingTeams] Found %d check-ins for volunteer %v (after time filter: %d)\n", len(checkIns), volunteerID, len(filteredCheckIns))
+
+	// Group by team (all check-ins are for this volunteer)
 	teamMap := make(map[uuid.UUID][]models.ParticipantCheckIn)
 	for _, checkIn := range filteredCheckIns {
 		teamMap[checkIn.TeamID] = append(teamMap[checkIn.TeamID], checkIn)
 	}
+
+	fmt.Printf("[GetPendingTeams] Grouped into %d unique teams\n", len(teamMap))
 
 	// Build pending teams list (exclude confirmed ones)
 	pendingTeams := make([]gin.H, 0)
@@ -471,6 +472,7 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 			fmt.Printf("[GetPendingTeams] Error checking confirmation for team %v: %v\n", teamID, err)
 		}
 		if isConfirmed {
+			fmt.Printf("[GetPendingTeams] Team %v already confirmed, skipping\n", teamID)
 			continue // Skip confirmed teams
 		}
 
@@ -480,21 +482,61 @@ func (h *VolunteerHandler) GetPendingTeams(c *gin.Context) {
 			continue // Skip if team not found
 		}
 		if team == nil {
+			fmt.Printf("[GetPendingTeams] Team %v is nil, skipping\n", teamID)
 			continue // Skip if team is nil
 		}
 
+		// Normalize city comparison (handle case differences and "Bangalore" vs "BLR")
+		teamCityStr := ""
+		if team.City != nil {
+			teamCityStr = string(*team.City)
+		}
+
+		// Normalize both cities for comparison (case-insensitive)
+		normalizeCity := func(city string) string {
+			cityLower := strings.ToLower(strings.TrimSpace(city))
+			if cityLower == "bangalore" || cityLower == "bengaluru" || cityLower == "blr" {
+				return "BLR"
+			}
+			// Return uppercase for other cities (PUNE, NOIDA, LKO)
+			return strings.ToUpper(cityLower)
+		}
+
+		teamCityNormalized := normalizeCity(teamCityStr)
+		volunteerCityNormalized := normalizeCity(volunteerCity)
+
 		// Ensure team location matches volunteer city (if volunteer has city set)
-		if volunteerCity != "" && team.City != nil && string(*team.City) != volunteerCity {
+		if volunteerCity != "" && teamCityStr != "" && teamCityNormalized != volunteerCityNormalized {
+			fmt.Printf("[GetPendingTeams] Team %v city mismatch: team=%s (normalized=%s), volunteer=%s (normalized=%s), skipping\n",
+				teamID, teamCityStr, teamCityNormalized, volunteerCity, volunteerCityNormalized)
 			continue // Skip teams from different cities
 		}
 
-		pendingTeams = append(pendingTeams, gin.H{
+		fmt.Printf("[GetPendingTeams] Adding team %v (%s) to pending list\n", teamID, team.TeamName)
+
+		teamData := gin.H{
 			"team":               team,
 			"participants":       participants,
 			"checked_in_at":      participants[0].CheckedInAt,
 			"participants_count": len(participants),
-		})
+		}
+
+		// Check if team already has a seat allocated (for BLR teams)
+		if teamCityNormalized == "BLR" && h.seatAllocationService != nil {
+			allocation, err := h.seatAllocationService.GetTeamAllocation(teamID)
+			if err == nil && allocation != nil {
+				teamData["seat_allocation"] = gin.H{
+					"block_name": allocation.BlockName,
+					"room_name":  allocation.RoomName,
+					"seat_label": allocation.SeatLabel,
+					"team_size":  allocation.TeamSize,
+				}
+			}
+		}
+
+		pendingTeams = append(pendingTeams, teamData)
 	}
 
+	fmt.Printf("[GetPendingTeams] Returning %d pending teams\n", len(pendingTeams))
 	c.JSON(http.StatusOK, gin.H{"pending_teams": pendingTeams})
 }

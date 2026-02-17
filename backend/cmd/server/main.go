@@ -10,6 +10,7 @@ import (
 	"github.com/rift26/backend/internal/database"
 	"github.com/rift26/backend/internal/handlers"
 	"github.com/rift26/backend/internal/middleware"
+	"github.com/rift26/backend/internal/models"
 	"github.com/rift26/backend/internal/repository"
 	"github.com/rift26/backend/internal/services"
 	"github.com/rift26/backend/pkg/email"
@@ -62,20 +63,22 @@ func main() {
 
 	// Initialize participant check-in repository
 	participantCheckinRepo := repository.NewParticipantCheckInRepository(db.DB)
-
+	volunteerAdminRepo := repository.NewVolunteerAdminRepository(db)
 	// GORM for seat allocation (Bengaluru blocks/rooms/seats)
 	gormDB, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect GORM for seat allocation: %v", err)
 	}
 	seatAllocationService := services.NewSeatAllocationService(gormDB)
+	volunteerAdminService := services.NewVolunteerAdminService(volunteerAdminRepo)
 
 	// Initialize handlers
 	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange, seatAllocationService)
 	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
 	scannerHandler := handlers.NewVolunteerHandler(checkinService, participantCheckinRepo, teamRepo, volunteerRepo, seatAllocationService)
 	seatAllocatorHandler := handlers.NewSeatAllocatorHandler(gormDB)
-	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)                                      // Volunteer auth handler
+	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)
+	volunteerAdminHandler := handlers.NewVolunteerAdminHandler(volunteerAdminService, volunteerRepo, participantCheckinRepo, seatAllocationService, gormDB)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
 	ticketHandler := handlers.NewTicketHandler(ticketService)
@@ -140,6 +143,12 @@ func main() {
 		// Dashboard route (public via token)
 		v1.GET("/dashboard/:token", teamHandler.GetDashboard)
 
+		// Public room view (seating layout + allocations by city and room name) — no auth
+		publicRoutes := v1.Group("/public")
+		{
+			publicRoutes.GET("/viewroom/:city/:roomname", seatAllocatorHandler.GetPublicRoomView)
+		}
+
 		// Ticket creation (public, but requires team info)
 		v1.POST("/tickets", ticketHandler.CreateTicket)
 
@@ -153,6 +162,8 @@ func main() {
 
 		// Volunteer routes (public login + table list)
 		v1.POST("/volunteer/login", volunteerAuthHandler.Login)
+		// Volunteer Admin (city-scoped) — public login
+		v1.POST("/volunteer-admin/login", volunteerAdminHandler.Login)
 		v1.GET("/volunteer/tables", func(c *gin.Context) {
 			// Public endpoint to get active tables for volunteer login selection
 			isActive := true
@@ -182,14 +193,26 @@ func main() {
 			checkinRoutes.DELETE("/:team_id", scannerHandler.UndoCheckIn)           // Undo a check-in
 		}
 
-		// Table viewer routes (protected)
+		// Table routes (protected) - renamed but kept for backward compatibility
+		// These are now used by scanner page for pending teams and actions
 		tableRoutes := v1.Group("/table")
 		tableRoutes.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		tableRoutes.Use(middleware.RoleMiddleware("volunteer", "admin"))
 		{
 			tableRoutes.POST("/confirm", scannerHandler.ConfirmTable)       // Mark team as done
 			tableRoutes.POST("/allocate-seat", scannerHandler.AllocateSeat) // Allocate Bengaluru seat for team
-			tableRoutes.GET("/pending", scannerHandler.GetPendingTeams)     // Get pending teams
+			tableRoutes.GET("/pending", scannerHandler.GetPendingTeams)     // Get pending teams checked in by volunteer
+		}
+
+		// Volunteer Admin dashboard (protected — role volunteer_admin, city from JWT)
+		volunteerAdminRoutes := v1.Group("/volunteer-admin")
+		volunteerAdminRoutes.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		volunteerAdminRoutes.Use(middleware.RoleMiddleware(models.UserRoleVolunteerAdmin))
+		{
+			volunteerAdminRoutes.GET("/volunteers", volunteerAdminHandler.GetVolunteers)
+			volunteerAdminRoutes.GET("/check-ins", volunteerAdminHandler.GetCheckIns)
+			volunteerAdminRoutes.GET("/check-in-teams", volunteerAdminHandler.GetCheckInTeams)
+			volunteerAdminRoutes.GET("/seat-summary", volunteerAdminHandler.GetSeatSummary)
 		}
 
 		// Admin login (public)
@@ -257,6 +280,11 @@ func main() {
 			adminRoutes.PUT("/seat-allocation/seats/mark-team-size", seatAllocatorHandler.MarkSeatsForTeamSize)
 			adminRoutes.GET("/seat-allocation/allocations", seatAllocatorHandler.GetAllAllocations)
 			adminRoutes.GET("/seat-allocation/stats", seatAllocatorHandler.GetAllocationStats)
+
+			// Volunteer Admins (create/list/delete city-scoped volunteer admins)
+			adminRoutes.POST("/volunteer-admins", volunteerAdminHandler.CreateVolunteerAdmin)
+			adminRoutes.GET("/volunteer-admins", volunteerAdminHandler.GetAllVolunteerAdmins)
+			adminRoutes.DELETE("/volunteer-admins/:id", volunteerAdminHandler.DeleteVolunteerAdmin)
 		}
 	}
 
