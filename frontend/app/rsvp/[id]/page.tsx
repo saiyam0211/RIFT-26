@@ -33,6 +33,16 @@ export default function RSVP2Page() {
 
     const fetchTeamDetails = async () => {
         try {
+            // Fetch config to check if final confirmation is open
+            const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`)
+            const finalModeRaw = configRes.data.final_open
+            const finalMode =
+                finalModeRaw === 'pin'
+                    ? 'pin'
+                    : finalModeRaw === true || finalModeRaw === 'true'
+                    ? 'true'
+                    : 'false'
+
             // Try multiple sources for the token
             let token = authToken || localStorage.getItem('auth_token')
             
@@ -79,6 +89,12 @@ export default function RSVP2Page() {
             // Check if team is in correct state for Final Confirmation
             if (teamData.status !== 'rsvp_done') {
                 setError('Team must complete RSVP before Final Confirmation')
+                return
+            }
+
+            // If final confirmation window is closed and team hasn't completed RSVP2 yet, block access
+            if (finalMode === 'false' && !teamData.rsvp2_locked) {
+                setError('Final Confirmation is now closed. You cannot make further changes.')
                 return
             }
 

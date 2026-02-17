@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"os"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/middleware"
@@ -149,6 +152,13 @@ func (h *TeamHandler) GetDashboard(c *gin.Context) {
 // SubmitRSVP2 handles RSVP II submission (member selection)
 // PUT /api/v1/teams/:id/rsvp2
 func (h *TeamHandler) SubmitRSVP2(c *gin.Context) {
+	// Enforce FINAL_OPEN feature flag on backend as a hard gate
+	finalMode := strings.ToLower(strings.TrimSpace(os.Getenv("FINAL_OPEN")))
+	if finalMode != "true" && finalMode != "pin" {
+		c.JSON(400, gin.H{"error": "Final Confirmation is closed"})
+		return
+	}
+
 	teamIDStr := c.Param("id")
 	teamID, err := uuid.Parse(teamIDStr)
 	if err != nil {

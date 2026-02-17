@@ -89,6 +89,9 @@ export default function VolunteerScannerPage() {
 
                     scanner.render(onScanSuccess, onScanError)
                     scannerRef.current = scanner
+
+                    // Remove the default "Scan an Image File" option from the library UI
+                    setTimeout(hideImageScanOption, 0)
                 } catch (err) {
                     console.error("Failed to initialize scanner:", err)
                 }
@@ -111,6 +114,26 @@ export default function VolunteerScannerPage() {
             }
         }
     }, [scanning, router])
+
+    const hideImageScanOption = () => {
+        if (typeof window === 'undefined') return
+        const container = document.getElementById('qr-reader')
+        if (!container) return
+
+        // Hide any control that mentions scanning an image / file
+        const candidates = container.querySelectorAll('button, a, span')
+        candidates.forEach((el) => {
+            if (el.textContent && el.textContent.toLowerCase().includes('scan an image')) {
+                (el as HTMLElement).style.display = 'none'
+            }
+        })
+
+        // Hide file input if present
+        const fileInput = container.querySelector('input[type="file"]') as HTMLElement | null
+        if (fileInput) {
+            fileInput.style.display = 'none'
+        }
+    }
 
     const onScanSuccess = async (decodedText: string) => {
         if (processing) return
@@ -499,9 +522,32 @@ export default function VolunteerScannerPage() {
                 {scanning && (
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                         <div id="qr-reader" className="w-full"></div>
-                        <div className="p-4 text-center">
+                        <div className="p-4 text-center space-y-3">
                             <p className="text-zinc-400 text-sm">Position QR code within the frame</p>
+                            <button
+                                type="button"
+                                onClick={() => setScanning(false)}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 transition"
+                            >
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Stop scanning
+                            </button>
                         </div>
+                    </div>
+                )}
+                {!scanning && !scannedTeam && (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center space-y-3">
+                        <p className="text-zinc-300 text-sm font-medium">Scanner paused</p>
+                        <p className="text-zinc-500 text-xs">
+                            Tap below to start the camera and begin scanning QR codes.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setScanning(true)}
+                            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-sm font-semibold text-white transition"
+                        >
+                            Start scanning
+                        </button>
                     </div>
                 )}
 

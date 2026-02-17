@@ -208,16 +208,39 @@ export default function Home() {
             
             console.log('Auth saved - Token:', token?.substring(0, 20) + '...', 'Team:', teamData.team_name);
             
-            // FORCE RSVP II FLOW FOR RSVP_DONE TEAMS
-            // If team status is rsvp_done, always go to RSVP II regardless of other conditions
-            if (teamData.status === 'rsvp_done') {
-                console.log('FORCING RSVP II - Team has rsvp_done status (no OTP path)');
-                // Small delay to ensure localStorage is written
-                setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
-            } else if (teamData.status === 'rsvp2_done' && teamData.dashboard_token) {
+            // Handle navigation based on team status and feature flags
+            if (teamData.status === 'rsvp2_done' && teamData.dashboard_token) {
                 // RSVP II completed, go to dashboard
                 console.log('Redirecting to dashboard - RSVP II completed');
                 setTimeout(() => router.push(`/dashboard/${teamData.dashboard_token}`), 100);
+            } else if (teamData.status === 'rsvp_done') {
+                // Team has completed RSVP I, check if Final Confirmation is open
+                try {
+                    const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`)
+                    const finalModeRaw = configRes.data.final_open
+                    const finalMode =
+                        finalModeRaw === 'pin'
+                            ? 'pin'
+                            : finalModeRaw === true || finalModeRaw === 'true'
+                            ? 'true'
+                            : 'false'
+
+                    if (finalMode === 'false') {
+                        console.log('Final Confirmation is closed - redirecting to dashboard (no RSVP II)');
+                        if (teamData.dashboard_token) {
+                            setTimeout(() => router.push(`/dashboard/${teamData.dashboard_token}`), 100);
+                        } else {
+                            setTimeout(() => router.push('/'), 100);
+                        }
+                    } else {
+                        console.log('FORCING RSVP II - Final Confirmation is open');
+                        // Small delay to ensure localStorage is written
+                        setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch config for final_open, defaulting to allow RSVP II', e);
+                    setTimeout(() => router.push(`/rsvp/${teamData.id}`), 100);
+                }
             } else if (teamData.rsvp_locked && teamData.dashboard_token) {
                 // Fallback: Old flow - RSVP locked, go to dashboard
                 console.log('Redirecting to dashboard - legacy RSVP locked fallback');

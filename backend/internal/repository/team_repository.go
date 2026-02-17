@@ -559,12 +559,17 @@ func (r *TeamRepository) CreateTeamWithMembers(ctx context.Context, team models.
 	}
 	defer tx.Rollback()
 
-	// Create team
+	// Create team - include all fields that might be set
 	teamQuery := `
-		INSERT INTO teams (id, team_name, city, status, member_count, problem_statement)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO teams (id, team_name, city, status, member_count, problem_statement, 
+		                   qr_code_token, dashboard_token, rsvp_locked, rsvp_locked_at, 
+		                   rsvp2_locked, rsvp2_locked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
-	_, err = tx.ExecContext(ctx, teamQuery, team.ID, team.TeamName, team.City, team.Status, team.MemberCount, team.ProblemStatement)
+	_, err = tx.ExecContext(ctx, teamQuery, 
+		team.ID, team.TeamName, team.City, team.Status, team.MemberCount, team.ProblemStatement,
+		team.QRCodeToken, team.DashboardToken, team.RSVPLocked, team.RSVPLockedAt,
+		team.RSVP2Locked, team.RSVP2LockedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create team: %w", err)
 	}
@@ -572,12 +577,12 @@ func (r *TeamRepository) CreateTeamWithMembers(ctx context.Context, team models.
 	// Batch insert members
 	if len(members) > 0 {
 		memberQuery := `
-			INSERT INTO team_members (id, team_id, name, email, phone, role)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO team_members (id, team_id, name, email, phone, role, individual_qr_token)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 		`
 		for _, member := range members {
 			_, err = tx.ExecContext(ctx, memberQuery,
-				member.ID, member.TeamID, member.Name, member.Email, member.Phone, member.Role)
+				member.ID, member.TeamID, member.Name, member.Email, member.Phone, member.Role, member.IndividualQRToken)
 			if err != nil {
 				return fmt.Errorf("failed to create member %s: %w", member.Name, err)
 			}

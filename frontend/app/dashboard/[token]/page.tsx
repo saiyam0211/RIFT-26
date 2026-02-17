@@ -28,6 +28,8 @@ export default function DashboardPage() {
     const [ticketMessage, setTicketMessage] = useState('')
     const [ticketSubmitting, setTicketSubmitting] = useState(false)
     const [currentUserEmail, setCurrentUserEmail] = useState('')
+    const [finalMode, setFinalMode] = useState<'true' | 'false' | 'pin'>('false')
+    const [showFinalClosedModal, setShowFinalClosedModal] = useState(false)
 
     useEffect(() => {
         fetchDashboard()
@@ -54,6 +56,27 @@ export default function DashboardPage() {
                     type: 'team',
                 })
                 setQRCodeData(qrData)
+            }
+
+            // Fetch feature flags (for final confirmation state)
+            try {
+                const configRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/config`)
+                const finalRaw = configRes.data.final_open
+                const mode: 'true' | 'false' | 'pin' =
+                    finalRaw === 'pin'
+                        ? 'pin'
+                        : finalRaw === true || finalRaw === 'true'
+                        ? 'true'
+                        : 'false'
+                setFinalMode(mode)
+
+                // If final confirmation is closed and team is only RSVP I done, show modal
+                if (mode === 'false' && response.data.team.status === 'rsvp_done') {
+                    setShowFinalClosedModal(true)
+                }
+            } catch (e) {
+                // If config fails, default finalMode remains 'false', but we won't block anything extra here
+                // (backend still enforces FINAL_OPEN on RSVP2)
             }
 
             setLoading(false)
@@ -205,8 +228,55 @@ export default function DashboardPage() {
 
             </div>
 
+            {/* Final confirmation closed modal (RSVP I only) */}
+            {showFinalClosedModal && team.status === 'rsvp_done' && (
+                <div
+                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                    onClick={() => setShowFinalClosedModal(false)}
+                >
+                    <div
+                        className="bg-[#1a1a1a] border border-red-500/50 rounded-2xl max-w-lg w-full p-6 space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-white">Final Confirmation not completed</h2>
+                            <button
+                                onClick={() => setShowFinalClosedModal(false)}
+                                className="text-gray-400 hover:text-white transition"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <p className="text-red-400 text-sm">
+                            Our records show that your team completed RSVP I but did <strong>not</strong> submit the
+                            Final Confirmation form.
+                        </p>
+                        <p className="text-gray-300 text-sm">
+                            The Final Confirmation window is now closed. This means your team is{' '}
+                            <strong>not eligible to participate in the offline hackathon</strong>.
+                        </p>
+                        <p className="text-gray-400 text-sm">
+                            We understand this is disappointing, but the rules and timelines were communicated to all
+                            teams. At this stage, <strong>we’re not able to make any exceptions or manual changes</strong>.
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                            You can still explore the dashboard for reference, but the event check‑in QR code and seat
+                            allocation are disabled for your team.
+                        </p>
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setShowFinalClosedModal(false)}
+                                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
+                            >
+                                I understand
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* QR Code Modal */}
-            {showQRModal && qrCodeData && (
+            {showQRModal && qrCodeData && team.status !== 'rsvp_done' && (
                 <div
                     className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
                     onClick={() => setShowQRModal(false)}
@@ -361,8 +431,21 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* QR Code - Clickable */}
-                    {qrCodeData && (team.status === 'rsvp_done' || team.status === 'rsvp2_done' || team.status === 'checked_in') && (
+                    {/* Final confirmation warning banner for RSVP I only (when final is closed) */}
+                    {team.status === 'rsvp_done' && finalMode === 'false' && (
+                        <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 text-sm text-red-200">
+                            <p className="font-semibold mb-1">Final Confirmation not completed</p>
+                            <p>
+                                Your team completed RSVP I but did <strong>not</strong> submit the Final Confirmation form
+                                before the deadline. As a result, your team is{' '}
+                                <strong>not eligible for the offline hackathon</strong>. The check‑in QR code and seat
+                                allocation are disabled for this team, and we’re not able to override this now.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* QR Code - Clickable (only for RSVP2 done / checked-in) */}
+                    {qrCodeData && (team.status === 'rsvp2_done' || team.status === 'checked_in') && (
                         <div
                             onClick={() => setShowQRModal(true)}
                             className="bg-white/5 border border-white/10 p-5 mx-auto rounded-xl w-56 justify-center items-center cursor-pointer hover:bg-white/10 transition group"

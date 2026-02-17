@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -656,12 +657,28 @@ func (h *AdminHandler) CreateTeamManually(c *gin.Context) {
 		City:        city,
 		Status:      "shortlisted",
 		MemberCount: len(req.Members),
-		RSVPLocked:  req.RSVPCompleted,
 	}
 
 	// Generate dashboard token
 	dashboardToken := uuid.New().String()
 	team.DashboardToken = &dashboardToken
+
+	// If RSVP completed (actually RSVP2/final confirmation), set RSVP2Locked and generate QR token
+	if req.RSVPCompleted {
+		// Generate QR token for team check-in
+		qrToken := uuid.New().String()
+		team.QRCodeToken = &qrToken
+		
+		// Set RSVP2 locked (final confirmation) and status
+		team.RSVP2Locked = true
+		now := time.Now()
+		team.RSVP2LockedAt = &now
+		team.Status = models.StatusRSVP2Done
+		
+		// Also set RSVP1 as done (they skipped RSVP1 and went straight to RSVP2)
+		team.RSVPLocked = true
+		team.RSVPLockedAt = &now
+	}
 
 	// Prepare team members
 	var teamMembers []models.TeamMember

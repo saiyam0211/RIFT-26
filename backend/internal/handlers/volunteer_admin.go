@@ -20,6 +20,8 @@ type VolunteerAdminHandler struct {
 	volunteerRepo         *repository.VolunteerRepository
 	checkinRepo           *repository.ParticipantCheckInRepository
 	seatAllocService      *services.SeatAllocationService
+	eventTableService     *services.EventTableService
+	teamRepo              *repository.TeamRepository
 	gormDB                *gorm.DB
 }
 
@@ -28,6 +30,8 @@ func NewVolunteerAdminHandler(
 	volunteerRepo *repository.VolunteerRepository,
 	checkinRepo *repository.ParticipantCheckInRepository,
 	seatAllocService *services.SeatAllocationService,
+	eventTableService *services.EventTableService,
+	teamRepo *repository.TeamRepository,
 	gormDB *gorm.DB,
 ) *VolunteerAdminHandler {
 	return &VolunteerAdminHandler{
@@ -35,6 +39,8 @@ func NewVolunteerAdminHandler(
 		volunteerRepo:         volunteerRepo,
 		checkinRepo:          checkinRepo,
 		seatAllocService:     seatAllocService,
+		eventTableService:    eventTableService,
+		teamRepo:             teamRepo,
 		gormDB:               gormDB,
 	}
 }
@@ -114,7 +120,7 @@ func (h *VolunteerAdminHandler) GetCheckIns(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"check_ins": list, "city": city})
 }
 
-// GetCheckInTeams returns checked-in teams (team name, size, room allocated) with optional filters.
+// GetCheckInTeams returns checked-in teams (team name, leader, size, table) with optional filters.
 func (h *VolunteerAdminHandler) GetCheckInTeams(c *gin.Context) {
 	city := getCityFromContext(c)
 	if city == "" {
@@ -129,11 +135,12 @@ func (h *VolunteerAdminHandler) GetCheckInTeams(c *gin.Context) {
 		}
 	}
 	f := repository.CheckedInTeamFilters{
-		TeamNameSearch:  strings.TrimSpace(c.Query("search")),
-		VolunteerEmail:  strings.TrimSpace(c.Query("volunteer_email")),
-		FromDate:        strings.TrimSpace(c.Query("from_date")),
-		ToDate:          strings.TrimSpace(c.Query("to_date")),
-		RoomNameFilter:  strings.TrimSpace(c.Query("room")),
+		TeamNameSearch: strings.TrimSpace(c.Query("search")),
+	}
+	if tableIDStr := c.Query("table_id"); tableIDStr != "" {
+		if tableID, err := uuid.Parse(tableIDStr); err == nil {
+			f.TableID = &tableID
+		}
 	}
 	list, err := h.checkinRepo.GetCheckedInTeamsByCity(normalized, limit, f)
 	if err != nil {
@@ -141,7 +148,79 @@ func (h *VolunteerAdminHandler) GetCheckInTeams(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch checked-in teams", "detail": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"check_in_teams": list, "city": city})
+	c.JSON(http.StatusOK, gin.H{"check_in_teams": list, "city": city, "total": len(list)})
+}
+
+// GetTables returns event tables for the volunteer admin's city.
+func (h *VolunteerAdminHandler) GetTables(c *gin.Context) {
+	city := getCityFromContext(c)
+	if city == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "city not set"})
+		return
+	}
+	normalized := normalizeCityForFilter(city)
+	isActive := true
+	tables, err := h.eventTableService.GetAllEventTables(&normalized, &isActive)
+	if err != nil {
+		log.Printf("[VolunteerAdmin] GetTables: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tables", "detail": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tables": tables, "city": city})
+}
+
+// GetTeamDetails returns team details with all checked-in members.
+func (h *VolunteerAdminHandler) GetTeamDetails(c *gin.Context) {
+	teamIDStr := c.Param("team_id")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
+		return
+	}
+	city := getCityFromContext(c)
+	if city == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "city not set"})
+		return
+	}
+	// Get team with members
+	team, err := h.teamRepo.GetByID(c.Request.Context(), teamID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+		return
+	}
+	if team == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+		return
+	}
+	// Verify team is in the admin's city
+	teamCityStr := ""
+	if team.City != nil {
+		teamCityStr = string(*team.City)
+	}
+	if normalizeCityForFilter(teamCityStr) != normalizeCityForFilter(city) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Team not in your city"})
+		return
+	}
+	// Get checked-in participants for this team
+	checkIns, err := h.checkinRepo.GetByTeamID(teamID)
+	if err != nil {
+		log.Printf("[VolunteerAdmin] GetTeamDetails: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch check-ins"})
+		return
+	}
+	// Build response with checked-in members
+	checkedInMembers := make([]map[string]interface{}, 0)
+	for _, ci := range checkIns {
+		checkedInMembers = append(checkedInMembers, map[string]interface{}{
+			"participant_name": ci.ParticipantName,
+			"participant_role": ci.ParticipantRole,
+			"checked_in_at":    ci.CheckedInAt,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"team": team,
+		"checked_in_members": checkedInMembers,
+	})
 }
 
 func parseInt(s string, base, min, max int) (int, error) {

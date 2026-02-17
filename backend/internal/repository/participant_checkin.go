@@ -294,11 +294,8 @@ func (r *ParticipantCheckInRepository) GetRecentByCity(city string, limit int) (
 
 // CheckedInTeamFilters optional filters for GetCheckedInTeamsByCity.
 type CheckedInTeamFilters struct {
-	TeamNameSearch  string // ILIKE %teamNameSearch%
-	VolunteerEmail  string
-	FromDate        string // YYYY-MM-DD
-	ToDate          string // YYYY-MM-DD
-	RoomNameFilter  string // ILIKE %RoomNameFilter%
+	TeamNameSearch  string    // ILIKE %teamNameSearch%
+	TableID         *uuid.UUID // filter by event table ID (volunteers assigned to this table)
 }
 
 // GetCheckedInTeamsByCity returns one row per checked-in team (team name, size, room allocated) for the city.
@@ -309,9 +306,9 @@ func (r *ParticipantCheckInRepository) GetCheckedInTeamsByCity(city string, limi
 	// Base: distinct teams from participant_check_ins (via volunteers in city). Table = volunteer's assigned table (volunteers are table-specific).
 	query := `
 		SELECT t.id AS team_id, t.team_name,
+		       (SELECT tm.name FROM team_members tm WHERE tm.team_id = t.id AND tm.role = 'leader' LIMIT 1) AS team_leader_name,
 		       COUNT(p.id)::int AS team_size,
 		       MAX(p.checked_in_at) AS latest_checkin_at,
-		       (SELECT r.name FROM seat_allocations sa JOIN rooms r ON r.id = sa.room_id WHERE sa.team_id = t.id LIMIT 1) AS room_name,
 		       (SELECT COALESCE(et.table_name, et.table_number) FROM participant_check_ins p2 JOIN volunteers v2 ON p2.volunteer_id = v2.id LEFT JOIN event_tables et ON et.id = v2.table_id WHERE p2.team_id = t.id ORDER BY p2.checked_in_at DESC LIMIT 1) AS table_name,
 		       (SELECT v2.email FROM participant_check_ins p2 JOIN volunteers v2 ON p2.volunteer_id = v2.id WHERE p2.team_id = t.id ORDER BY p2.checked_in_at DESC LIMIT 1) AS volunteer_email
 		FROM teams t
@@ -326,24 +323,9 @@ func (r *ParticipantCheckInRepository) GetCheckedInTeamsByCity(city string, limi
 		args = append(args, "%"+f.TeamNameSearch+"%")
 		n++
 	}
-	if f.VolunteerEmail != "" {
-		query += fmt.Sprintf(" AND v.email = $%d", n)
-		args = append(args, f.VolunteerEmail)
-		n++
-	}
-	if f.FromDate != "" {
-		query += fmt.Sprintf(" AND p.checked_in_at >= $%d::date", n)
-		args = append(args, f.FromDate)
-		n++
-	}
-	if f.ToDate != "" {
-		query += fmt.Sprintf(" AND p.checked_in_at <= ($%d::date + interval '1 day')", n)
-		args = append(args, f.ToDate)
-		n++
-	}
-	if f.RoomNameFilter != "" {
-		query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM seat_allocations sa JOIN rooms r ON r.id = sa.room_id WHERE sa.team_id = t.id AND r.name ILIKE $%d)", n)
-		args = append(args, "%"+f.RoomNameFilter+"%")
+	if f.TableID != nil {
+		query += fmt.Sprintf(" AND v.table_id = $%d", n)
+		args = append(args, *f.TableID)
 		n++
 	}
 
@@ -358,14 +340,14 @@ func (r *ParticipantCheckInRepository) GetCheckedInTeamsByCity(city string, limi
 	var list []models.CheckedInTeam
 	for rows.Next() {
 		var row models.CheckedInTeam
-		var roomName, tableName sql.NullString
+		var leaderName, tableName sql.NullString
 		var volunteerEmail sql.NullString
-		err := rows.Scan(&row.TeamID, &row.TeamName, &row.TeamSize, &row.LatestCheckInAt, &roomName, &tableName, &volunteerEmail)
+		err := rows.Scan(&row.TeamID, &row.TeamName, &leaderName, &row.TeamSize, &row.LatestCheckInAt, &tableName, &volunteerEmail)
 		if err != nil {
 			return nil, err
 		}
-		if roomName.Valid {
-			row.RoomName = &roomName.String
+		if leaderName.Valid {
+			row.TeamLeaderName = leaderName.String
 		}
 		if tableName.Valid {
 			row.TableName = &tableName.String

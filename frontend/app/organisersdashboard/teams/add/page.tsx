@@ -25,7 +25,8 @@ export default function AddTeamManually() {
         { name: '', email: '', phone: '', role: 'member' }
     ]);
 
-    const cities = ['Pune', 'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Ahmedabad', 'Other'];
+    // RIFT cities only
+    const cities = ['Bangalore', 'Pune', 'Noida', 'Lucknow'];
 
     const addMember = () => {
         if (members.length >= 4) {
@@ -60,7 +61,7 @@ export default function AddTeamManually() {
         }
 
         if (rsvpCompleted && !city) {
-            setError('City is required for teams with completed RSVP');
+            setError('City is required for teams with completed RSVP2 (Final Confirmation)');
             return false;
         }
 
@@ -149,7 +150,7 @@ export default function AddTeamManually() {
             }
 
             const successMsg = rsvpCompleted
-                ? `Team "${teamName}" created successfully with RSVP completed! They can now access the dashboard.`
+                ? `Team "${teamName}" created successfully with RSVP2 (Final Confirmation) completed! QR token and dashboard token generated. They can now access the dashboard.`
                 : `Team "${teamName}" created successfully! They can now complete their RSVP.`;
 
             setSuccess(successMsg);
@@ -230,7 +231,7 @@ export default function AddTeamManually() {
                             className="w-4 h-4 text-red-600 border-zinc-700 rounded focus:ring-red-500"
                         />
                         <label htmlFor="rsvpCompleted" className="text-sm font-medium text-zinc-300">
-                            Mark RSVP as completed (team can participate directly)
+                            Mark RSVP2 (Final Confirmation) as completed (team can participate directly)
                         </label>
                     </div>
 

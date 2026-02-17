@@ -18,6 +18,8 @@ type Config struct {
 	AllowCityChange bool   // Set to false to prevent teams from changing their city during RSVP
 	RSVPOpen        string // "true" = open, "false" = closed, "pin" = PIN-protected
 	RSVPPinSecret   string // Secret for generating 6-digit PIN (rotates every 3 hours)
+	FinalOpen       string // "true" = open, "false" = closed, "pin" = PIN-protected (for final confirmation form)
+	FinalPinSecret  string // Secret for generating 6-digit PIN for final confirmation (rotates every 3 hours)
 	// SMTP Email Configuration
 	SMTPHost      string
 	SMTPPort      string
@@ -37,11 +39,13 @@ func Load() (*Config, error) {
 		Port:           getEnv("PORT", "8080"),
 		Environment:    getEnv("ENVIRONMENT", "development"),
 		AllowedOrigins: getEnv("ALLOWED_ORIGINS", "http://localhost:3000"),
-		// Feature Flags (RSVP_OPEN from env only: "true" | "false" | "pin")
+		// Feature Flags (RSVP_OPEN and FINAL_OPEN from env only: "true" | "false" | "pin")
 		EnableEmailOTP:  getEnv("ENABLE_EMAIL_OTP", "false") == "true",
 		AllowCityChange: getEnv("ALLOW_CITY_CHANGE", "false") == "true",
 		RSVPOpen:        normalizeRSVPOpen(getEnv("RSVP_OPEN", "false")),
 		RSVPPinSecret:   getEnv("RSVP_PIN_SECRET", ""),
+		FinalOpen:       normalizeRSVPOpen(getEnv("FINAL_OPEN", "false")),
+		FinalPinSecret:  getEnv("FINAL_PIN_SECRET", ""),
 		// SMTP Configuration
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),

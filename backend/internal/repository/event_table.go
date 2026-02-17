@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/rift26/backend/internal/models"
@@ -72,29 +73,48 @@ func (r *EventTableRepository) GetByID(id uuid.UUID) (*models.EventTable, error)
 
 // GetAll retrieves all event tables with optional filters
 func (r *EventTableRepository) GetAll(city *string, isActive *bool) ([]models.EventTable, error) {
-	query := `
+	// Build query dynamically to avoid prepared statement cache issues
+	var queryParts []string
+	var conditions []string
+	
+	queryParts = append(queryParts, `
 		SELECT id, table_name, table_number, city, capacity, is_active, created_at, updated_at
 		FROM event_tables
 		WHERE 1=1
-	`
-	args := []interface{}{}
-	argCount := 1
+	`)
 
 	if city != nil {
-		query += fmt.Sprintf(" AND city = $%d", argCount)
-		args = append(args, *city)
-		argCount++
+		// Handle city variations: BLR/Bengaluru/Bangalore, PUNE/Pune, etc.
+		// Normalize and get all variations
+		cityNormalized := normalizeCityForEventTables(*city)
+		cityVariations := getCityVariations(cityNormalized)
+		
+		// Build IN clause with quoted values to avoid parameter binding issues
+		// Use string interpolation for whitelisted city values (safe since they're from our function)
+		quotedVariations := make([]string, len(cityVariations))
+		for i, cityVar := range cityVariations {
+			quotedVariations[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(cityVar, "'", "''"))
+		}
+		conditions = append(conditions, fmt.Sprintf("LOWER(TRIM(city)) IN (%s)", strings.Join(quotedVariations, ",")))
 	}
 
 	if isActive != nil {
-		query += fmt.Sprintf(" AND is_active = $%d", argCount)
-		args = append(args, *isActive)
-		argCount++
+		if *isActive {
+			conditions = append(conditions, "is_active = true")
+		} else {
+			conditions = append(conditions, "is_active = false")
+		}
 	}
 
-	query += " ORDER BY city, table_number"
+	if len(conditions) > 0 {
+		queryParts = append(queryParts, " AND "+strings.Join(conditions, " AND "))
+	}
 
-	rows, err := r.db.Query(query, args...)
+	queryParts = append(queryParts, " ORDER BY city, table_number")
+
+	query := strings.Join(queryParts, "")
+
+	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event tables: %w", err)
 	}
@@ -120,6 +140,39 @@ func (r *EventTableRepository) GetAll(city *string, isActive *bool) ([]models.Ev
 	}
 
 	return tables, nil
+}
+
+// normalizeCityForEventTables normalizes city names to match database values
+// The database stores cities as: BLR, PUNE, NOIDA, LKO
+func normalizeCityForEventTables(city string) string {
+	cityUpper := strings.ToUpper(strings.TrimSpace(city))
+	switch {
+	case cityUpper == "BENGALURU" || cityUpper == "BANGALORE" || cityUpper == "BLR":
+		return "BLR"
+	case cityUpper == "PUNE":
+		return "PUNE"
+	case cityUpper == "NOIDA":
+		return "NOIDA"
+	case cityUpper == "LUCKNOW" || cityUpper == "LKO":
+		return "LKO"
+	}
+	return cityUpper
+}
+
+// getCityVariations returns all possible city name variations for a normalized city code
+func getCityVariations(normalizedCity string) []string {
+	switch normalizedCity {
+	case "BLR":
+		return []string{"BLR", "Bengaluru", "Bangalore", "bengaluru", "bangalore", "blr"}
+	case "PUNE":
+		return []string{"PUNE", "Pune", "pune"}
+	case "NOIDA":
+		return []string{"NOIDA", "Noida", "noida"}
+	case "LKO":
+		return []string{"LKO", "Lucknow", "lucknow", "lko"}
+	default:
+		return []string{normalizedCity}
+	}
 }
 
 // Update updates an event table

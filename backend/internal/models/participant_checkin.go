@@ -49,6 +49,7 @@ type CheckInResponse struct {
 type CheckedInTeam struct {
 	TeamID           uuid.UUID  `json:"team_id"`
 	TeamName         string     `json:"team_name"`
+	TeamLeaderName   string     `json:"team_leader_name"`      // team leader's name
 	TeamSize         int        `json:"team_size"`
 	RoomName         *string    `json:"room_name,omitempty"`   // from seat_allocations if allocated (Bengaluru)
 	TableName        *string    `json:"table_name,omitempty"`  // event table/counter from volunteer who checked in (volunteers are table-specific)

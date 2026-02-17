@@ -78,7 +78,7 @@ func main() {
 	scannerHandler := handlers.NewVolunteerHandler(checkinService, participantCheckinRepo, teamRepo, volunteerRepo, seatAllocationService)
 	seatAllocatorHandler := handlers.NewSeatAllocatorHandler(gormDB)
 	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)
-	volunteerAdminHandler := handlers.NewVolunteerAdminHandler(volunteerAdminService, volunteerRepo, participantCheckinRepo, seatAllocationService, gormDB)
+	volunteerAdminHandler := handlers.NewVolunteerAdminHandler(volunteerAdminService, volunteerRepo, participantCheckinRepo, seatAllocationService, eventTableService, teamRepo, gormDB)
 	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
 	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
 	ticketHandler := handlers.NewTicketHandler(ticketService)
@@ -122,10 +122,15 @@ func main() {
 			if rsvpOpen != "true" && rsvpOpen != "pin" {
 				rsvpOpen = "false"
 			}
+			finalOpen := cfg.FinalOpen
+			if finalOpen != "true" && finalOpen != "pin" {
+				finalOpen = "false"
+			}
 			c.JSON(200, gin.H{
 				"otp_enabled":         cfg.EnableEmailOTP,
 				"city_change_enabled": cfg.AllowCityChange,
 				"rsvp_open":           rsvpOpen,
+				"final_open":          finalOpen,
 			})
 		})
 
@@ -212,6 +217,8 @@ func main() {
 			volunteerAdminRoutes.GET("/volunteers", volunteerAdminHandler.GetVolunteers)
 			volunteerAdminRoutes.GET("/check-ins", volunteerAdminHandler.GetCheckIns)
 			volunteerAdminRoutes.GET("/check-in-teams", volunteerAdminHandler.GetCheckInTeams)
+			volunteerAdminRoutes.GET("/tables", volunteerAdminHandler.GetTables)
+			volunteerAdminRoutes.GET("/teams/:team_id", volunteerAdminHandler.GetTeamDetails)
 			volunteerAdminRoutes.GET("/seat-summary", volunteerAdminHandler.GetSeatSummary)
 		}
 
