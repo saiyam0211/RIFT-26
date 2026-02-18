@@ -642,8 +642,8 @@ export default function DashboardPage() {
                                     </a>
                                 ))}
                             </div>
-                            {/* Lock PS button (only if rsvp2_done and submission window open) */}
-                            {team?.status === 'rsvp2_done' && psSubmissionOpen && !psSelection && (
+                            {/* Lock PS button (only if checked_in and submission window open) */}
+                            {team?.status === 'checked_in' && psSubmissionOpen && !psSelection && (
                                 <div className="p-4 pt-0">
                                     <button
                                         onClick={() => setShowLockPSModal(true)}

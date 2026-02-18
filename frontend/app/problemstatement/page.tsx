@@ -147,7 +147,7 @@ export default function ProblemStatementPage() {
             </div>
           </div>
 
-          {hasAdminToken && (
+          {/* {hasAdminToken && (
             <button
               onClick={handleEndCountdown}
               disabled={releasing}
@@ -155,7 +155,7 @@ export default function ProblemStatementPage() {
             >
               {releasing ? 'Releasing...' : 'End countdown (test)'}
             </button>
-          )}
+          )} */}
 
           {error && <p className="mt-4 text-red-400 text-sm">{error}</p>}
         </div>
@@ -171,7 +171,7 @@ export default function ProblemStatementPage() {
               You can easily access the problem statements from your dashboard too!
             </p>
 
-            {hasAdminToken && (
+            {/* {hasAdminToken && (
               <div className="flex justify-center mb-6">
                 <button
                   onClick={handleRestartTimer}
@@ -182,7 +182,7 @@ export default function ProblemStatementPage() {
                   {resetting ? 'Resetting...' : 'Restart timer (test)'}
                 </button>
               </div>
-            )}
+            )} */}
 
             {list.length === 0 ? (
               <p className="text-center text-zinc-500">No problem statements uploaded yet.</p>

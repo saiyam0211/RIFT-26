@@ -21,7 +21,7 @@ func NewPSSelectionService(repo *repository.PSSelectionRepository, teamRepo *rep
 	return &PSSelectionService{repo: repo, teamRepo: teamRepo, psRepo: psRepo, settingsRepo: settingsRepo}
 }
 
-// LockPS locks a problem statement for a team (requires rsvp2_done, submission window open, leader email match).
+// LockPS locks a problem statement for a team (requires checked_in, submission window open, leader email match).
 func (s *PSSelectionService) LockPS(ctx context.Context, teamID, psID uuid.UUID, leaderEmail string) error {
 	team, err := s.teamRepo.GetByID(ctx, teamID)
 	if err != nil {
@@ -30,8 +30,9 @@ func (s *PSSelectionService) LockPS(ctx context.Context, teamID, psID uuid.UUID,
 	if team == nil {
 		return fmt.Errorf("team not found")
 	}
-	if team.Status != models.StatusRSVP2Done {
-		return fmt.Errorf("team must have completed final confirmation (rsvp2_done)")
+	// Only teams that have successfully checked in at the venue can lock a problem statement
+	if team.Status != models.StatusCheckedIn {
+		return fmt.Errorf("team must be checked_in to lock a problem statement")
 	}
 	// Check submission window
 	val, err := s.settingsRepo.Get(ctx, "ps_submission_open")

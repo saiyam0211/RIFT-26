@@ -8,8 +8,8 @@ import { MapPin, Plus, Grid3X3, Users, Film, Trash2, Save, LayoutGrid, DoorOpen,
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
 
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-const MAX_GRID_ROWS = 20
-const MAX_GRID_COLS = 28
+const MAX_GRID_ROWS = 50
+const MAX_GRID_COLS = 50
 const CELL_SIZE = 32
 const CELL_GAP = 2
 

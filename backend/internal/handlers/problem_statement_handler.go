@@ -141,10 +141,10 @@ func (h *ProblemStatementHandler) GetSubmissionStatus(c *gin.Context) {
 // POST /api/v1/admin/problem-statements/toggle-submission
 func (h *ProblemStatementHandler) ToggleSubmissionWindow(c *gin.Context) {
 	var req struct {
-		Open bool `json:"open" binding:"required"`
+		Open bool `json:"open"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	if err := h.service.SetSubmissionOpen(c.Request.Context(), req.Open); err != nil {
