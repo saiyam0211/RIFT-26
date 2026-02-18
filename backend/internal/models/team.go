@@ -48,9 +48,14 @@ type Team struct {
 	DashboardToken      *string      `json:"dashboard_token" db:"dashboard_token"`
 	MemberCount         int          `json:"member_count" db:"member_count"`
 	EditAllowedUntil    *time.Time   `json:"edit_allowed_until,omitempty" db:"edit_allowed_until"`
+	RegistrationDeskID   *uuid.UUID  `json:"registration_desk_id,omitempty" db:"registration_desk_id"`
 	CreatedAt        time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time    `json:"updated_at" db:"updated_at"`
 	Members          []TeamMember `json:"members,omitempty"`
+
+	// Populated when loading dashboard (join with event_tables)
+	RegistrationDeskTableName   *string `json:"registration_desk_table_name,omitempty" db:"-"`
+	RegistrationDeskTableNumber *string `json:"registration_desk_table_number,omitempty" db:"-"`
 }
 
 // CheckedIn returns true if the team has been checked in

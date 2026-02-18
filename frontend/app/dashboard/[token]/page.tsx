@@ -7,7 +7,7 @@ import QRCode from 'react-qr-code'
 import { Team, Announcement } from '@/types'
 import RIFTBackground from '@/components/RIFTBackground'
 import CustomLoader from '@/components/CustomLoader'
-import { X, Calendar, Ticket, Bell, MapPin } from 'lucide-react'
+import { X, Calendar, Ticket, Bell, MapPin, FileDown, Lock } from 'lucide-react'
 
 export default function DashboardPage() {
     const params = useParams()
@@ -18,6 +18,13 @@ export default function DashboardPage() {
     const [team, setTeam] = useState<Team | null>(null)
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [seatAllocation, setSeatAllocation] = useState<{ block_name: string; room_name: string; seat_label: string } | null>(null)
+    const [problemStatements, setProblemStatements] = useState<{ id: string; track: string; name: string; download_url: string }[]>([])
+    const [psSubmissionOpen, setPsSubmissionOpen] = useState(false)
+    const [psSelection, setPsSelection] = useState<{ problem_statement_id: string; locked_at: string } | null>(null)
+    const [showLockPSModal, setShowLockPSModal] = useState(false)
+    const [selectedPSId, setSelectedPSId] = useState('')
+    const [leaderEmail, setLeaderEmail] = useState('')
+    const [lockingPS, setLockingPS] = useState(false)
     const [qrCodeData, setQRCodeData] = useState('')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -79,6 +86,15 @@ export default function DashboardPage() {
                 // (backend still enforces FINAL_OPEN on RSVP2)
             }
 
+            // Problem statements and PS submission status (from dashboard response)
+            if (response.data.problem_statements && Array.isArray(response.data.problem_statements)) {
+                setProblemStatements(response.data.problem_statements)
+            }
+            setPsSubmissionOpen(response.data.ps_submission_open === true)
+            if (response.data.ps_selection) {
+                setPsSelection(response.data.ps_selection)
+            }
+
             setLoading(false)
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to load dashboard')
@@ -123,6 +139,29 @@ export default function DashboardPage() {
             alert('Failed to submit ticket. Please try again.')
         } finally {
             setTicketSubmitting(false)
+        }
+    }
+
+    const handleLockPS = async () => {
+        if (!selectedPSId || !leaderEmail.trim()) {
+            alert('Please select a problem statement and enter your leader email')
+            return
+        }
+        setLockingPS(true)
+        try {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/teams/${team?.id}/lock-ps`, {
+                problem_statement_id: selectedPSId,
+                leader_email: leaderEmail.trim()
+            })
+            alert('Problem statement locked successfully!')
+            setShowLockPSModal(false)
+            setSelectedPSId('')
+            setLeaderEmail('')
+            fetchDashboard()
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Failed to lock problem statement')
+        } finally {
+            setLockingPS(false)
         }
     }
 
@@ -408,6 +447,67 @@ export default function DashboardPage() {
                 </div>
             )}
 
+            {/* Lock PS Modal */}
+            {showLockPSModal && (
+                <div
+                    className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+                    onClick={(e) => e.target === e.currentTarget && setShowLockPSModal(false)}
+                >
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-white text-xl font-semibold flex items-center gap-2">
+                                <Lock className="text-purple-400" size={24} />
+                                Lock Problem Statement
+                            </h3>
+                            <button
+                                onClick={() => setShowLockPSModal(false)}
+                                className="text-gray-400 hover:text-white transition"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <p className="text-gray-300 text-sm">
+                                Select the problem statement your team will work on. Once locked, this cannot be changed.
+                            </p>
+                            <div>
+                                <label className="text-gray-300 text-sm mb-2 block">Problem Statement</label>
+                                <select
+                                    value={selectedPSId}
+                                    onChange={(e) => setSelectedPSId(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50"
+                                >
+                                    <option value="">Select a problem statement</option>
+                                    {problemStatements.map((ps) => (
+                                        <option key={ps.id} value={ps.id} className="bg-[#1a1a1a]">
+                                            {ps.track} - {ps.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-gray-300 text-sm mb-2 block">Leader Email</label>
+                                <input
+                                    type="email"
+                                    value={leaderEmail}
+                                    onChange={(e) => setLeaderEmail(e.target.value)}
+                                    placeholder="Enter your leader email"
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+                                />
+                                <p className="text-gray-400 text-xs mt-1">Must match the team leader's email</p>
+                            </div>
+                            <button
+                                onClick={handleLockPS}
+                                disabled={lockingPS || !selectedPSId || !leaderEmail.trim()}
+                                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium"
+                            >
+                                {lockingPS ? 'Locking...' : 'Lock Problem Statement'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Left Side - Fixed Title, Team Name, and QR Code */}
             <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 mt-10 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
                 <div className="space-y-8 lg:space-y-12">
@@ -444,6 +544,7 @@ export default function DashboardPage() {
                         </div>
                     )}
 
+
                     {/* QR Code - Clickable (only for RSVP2 done / checked-in) */}
                     {qrCodeData && (team.status === 'rsvp2_done' || team.status === 'checked_in') && (
                         <div
@@ -460,18 +561,7 @@ export default function DashboardPage() {
                         </div>
                     )}
 
-                    {/* Seat allocation (Bengaluru) */}
-                    {seatAllocation && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3">
-                            <MapPin className="text-emerald-400 shrink-0" size={24} />
-                            <div>
-                                <p className="text-emerald-300 font-semibold">Your seat</p>
-                                <p className="text-white">
-                                    Block <strong>{seatAllocation.block_name}</strong> → Room <strong>{seatAllocation.room_name}</strong> → Seat <strong>{seatAllocation.seat_label}</strong>
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                    
 
                     {/* Quick Actions */}
                     <div className="space-y-3">
@@ -483,13 +573,13 @@ export default function DashboardPage() {
                         >
                             📱 Copy Dashboard Link
                         </button>
-                        <button
+                        {/* <button
                             onClick={addToGoogleCalendar}
                             className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 font-medium"
                         >
                             <Calendar size={18} />
                             Add to Google Calendar
-                        </button>
+                        </button> */}
                     </div>
                 </div>
             </div>
@@ -497,6 +587,86 @@ export default function DashboardPage() {
             {/* Right Side - Details */}
             <div className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center mt-0 md:mt-20 py-8 lg:py-12">
                 <div className="w-full max-w-2xl space-y-6 px-6 lg:px-8">
+
+                   
+                         {/* Registration desk (all cities) — visit this table at venue for onboarding */}
+                    {(team?.registration_desk_table_name || team?.registration_desk_table_number) && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3">
+                            <MapPin className="text-amber-400 shrink-0" size={24} />
+                            <div>
+                                <p className="text-amber-300 font-semibold">Your registration desk</p>
+                                <p className="text-white">
+                                    Table <strong>{team?.registration_desk_table_name || team?.registration_desk_table_number || '—'}</strong>
+                                    {team?.registration_desk_table_number && team?.registration_desk_table_name && team.registration_desk_table_name !== team.registration_desk_table_number && (
+                                        <span className="text-zinc-400"> ({team.registration_desk_table_number})</span>
+                                    )}
+                                </p>
+                                <p className="text-zinc-400 text-sm mt-1">Visit this table at your venue for onboarding.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Seat allocation (Bengaluru) */}
+                    {seatAllocation && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3">
+                            <MapPin className="text-emerald-400 shrink-0" size={24} />
+                            <div>
+                                <p className="text-emerald-300 font-semibold">Your seat</p>
+                                <p className="text-white">
+                                    Block <strong>{seatAllocation.block_name}</strong> → Room <strong>{seatAllocation.room_name}</strong>
+                                     {/* → Seat <strong>{seatAllocation.seat_label}</strong> */}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Problem Statements (shown only to checked_in teams when released) */}
+                    {problemStatements.length > 0 && (
+                        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                            <h3 className="text-white text-xl font-semibold p-4 pb-2">Problem Statements</h3>
+                            <p className="text-zinc-400 text-sm px-4 pb-3">Download the problem statements for all tracks.</p>
+                            <div className="p-4 pt-0 space-y-2">
+                                {problemStatements.map((ps) => (
+                                    <a
+                                        key={ps.id}
+                                        href={ps.download_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition"
+                                    >
+                                        <div>
+                                            <span className="text-amber-400 text-xs font-medium">{ps.track}</span>
+                                            <p className="text-white font-medium">{ps.name}</p>
+                                        </div>
+                                        <FileDown className="text-zinc-400 shrink-0" size={20} />
+                                    </a>
+                                ))}
+                            </div>
+                            {/* Lock PS button (only if rsvp2_done and submission window open) */}
+                            {team?.status === 'rsvp2_done' && psSubmissionOpen && !psSelection && (
+                                <div className="p-4 pt-0">
+                                    <button
+                                        onClick={() => setShowLockPSModal(true)}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition"
+                                    >
+                                        <Lock size={18} />
+                                        Lock problem statement
+                                    </button>
+                                </div>
+                            )}
+                            {/* Already locked PS */}
+                            {psSelection && (
+                                <div className="p-4 pt-0">
+                                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                                        <p className="text-purple-300 font-semibold text-sm">✓ Problem statement locked</p>
+                                        <p className="text-zinc-400 text-xs mt-1">
+                                            Locked on {new Date(psSelection.locked_at).toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Team Members */}
                     {team.members && team.members.length > 0 && (

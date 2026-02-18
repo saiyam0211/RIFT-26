@@ -15,11 +15,12 @@ import (
 )
 
 type AdminHandler struct {
-	teamRepo         *repository.TeamRepository
-	announcementRepo *repository.AnnouncementRepository
-	teamService      *services.TeamService
-	userRepo         *repository.UserRepository
-	jwtSecret        string
+	teamRepo                      *repository.TeamRepository
+	announcementRepo              *repository.AnnouncementRepository
+	teamService                   *services.TeamService
+	userRepo                      *repository.UserRepository
+	jwtSecret                     string
+	registrationDeskAllocService  *services.RegistrationDeskAllocationService
 }
 
 func NewAdminHandler(
@@ -28,13 +29,15 @@ func NewAdminHandler(
 	teamService *services.TeamService,
 	userRepo *repository.UserRepository,
 	jwtSecret string,
+	registrationDeskAllocService *services.RegistrationDeskAllocationService,
 ) *AdminHandler {
 	return &AdminHandler{
-		teamRepo:         teamRepo,
-		announcementRepo: announcementRepo,
-		teamService:      teamService,
-		userRepo:         userRepo,
-		jwtSecret:        jwtSecret,
+		teamRepo:                     teamRepo,
+		announcementRepo:             announcementRepo,
+		teamService:                  teamService,
+		userRepo:                     userRepo,
+		jwtSecret:                    jwtSecret,
+		registrationDeskAllocService: registrationDeskAllocService,
 	}
 }
 
@@ -719,5 +722,44 @@ func (h *AdminHandler) CreateTeamManually(c *gin.Context) {
 		"team_id":         teamID.String(),
 		"dashboard_token": dashboardToken,
 		"rsvp_required":   !req.RSVPCompleted,
+	})
+}
+
+// AllocateRegistrationDesks allocates a registration desk (event_table) to each team by city.
+// Teams in a city are distributed evenly across that city's desks (e.g. 200 teams, 4 tables → 50 per table).
+// POST /api/v1/admin/registration-desks/allocate
+func (h *AdminHandler) AllocateRegistrationDesks(c *gin.Context) {
+	if h.registrationDeskAllocService == nil {
+		c.JSON(503, gin.H{"error": "Registration desk allocation not configured"})
+		return
+	}
+	result, err := h.registrationDeskAllocService.AllocateRegistrationDesks(c.Request.Context())
+	if err != nil {
+		log.Printf("[Admin] AllocateRegistrationDesks: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to allocate registration desks", "detail": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{
+		"message":  "Registration desks allocated successfully",
+		"result":   result,
+	})
+}
+
+// ClearAllRegistrationDesks sets registration_desk_id = NULL for all teams that have a desk allocated.
+// POST /api/v1/admin/registration-desks/clear
+func (h *AdminHandler) ClearAllRegistrationDesks(c *gin.Context) {
+	if h.registrationDeskAllocService == nil {
+		c.JSON(503, gin.H{"error": "Registration desk allocation not configured"})
+		return
+	}
+	cleared, err := h.registrationDeskAllocService.ClearAllRegistrationDesks(c.Request.Context())
+	if err != nil {
+		log.Printf("[Admin] ClearAllRegistrationDesks: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to clear registration desks", "detail": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{
+		"message": "All registration desk allocations cleared",
+		"cleared": cleared,
 	})
 }

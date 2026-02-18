@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,6 +53,15 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	volunteerRepo := repository.NewVolunteerRepository(db)
 	eventTableRepo := repository.NewEventTableRepository(db.DB)
+	problemStatementRepo := repository.NewProblemStatementRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	psSelectionRepo := repository.NewPSSelectionRepository(db)
+
+	// Upload dir for problem statement PDFs
+	uploadDir := filepath.Join(".", "uploads", "problem_statements")
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		log.Printf("Warning: could not create upload dir %s: %v", uploadDir, err)
+	}
 
 	// Initialize services
 	teamService := services.NewTeamService(teamRepo, announcementRepo)
@@ -60,6 +71,9 @@ func main() {
 	announcementService := services.NewAnnouncementService(db.DB)
 	volunteerService := services.NewVolunteerService(volunteerRepo)
 	eventTableService := services.NewEventTableService(eventTableRepo)
+	registrationDeskAllocService := services.NewRegistrationDeskAllocationService(teamRepo, eventTableRepo)
+	problemStatementService := services.NewProblemStatementService(problemStatementRepo, settingsRepo, cfg.APIPublicURL, uploadDir)
+	psSelectionService := services.NewPSSelectionService(psSelectionRepo, teamRepo, problemStatementRepo, settingsRepo)
 
 	// Initialize participant check-in repository
 	participantCheckinRepo := repository.NewParticipantCheckInRepository(db.DB)
@@ -73,18 +87,20 @@ func main() {
 	volunteerAdminService := services.NewVolunteerAdminService(volunteerAdminRepo)
 
 	// Initialize handlers
-	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange, seatAllocationService)
+	teamHandler := handlers.NewTeamHandler(teamService, cfg.JWTSecret, cfg.AllowCityChange, seatAllocationService, psSelectionService, problemStatementService)
 	emailOTPHandler := handlers.NewEmailOTPHandler(emailOTPService, cfg.EnableEmailOTP)
 	scannerHandler := handlers.NewVolunteerHandler(checkinService, participantCheckinRepo, teamRepo, volunteerRepo, seatAllocationService)
 	seatAllocatorHandler := handlers.NewSeatAllocatorHandler(gormDB)
 	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)
 	volunteerAdminHandler := handlers.NewVolunteerAdminHandler(volunteerAdminService, volunteerRepo, participantCheckinRepo, seatAllocationService, eventTableService, teamRepo, gormDB)
-	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret)
+	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret, registrationDeskAllocService)
 	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
 	ticketHandler := handlers.NewTicketHandler(ticketService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementService)
 	bulkEmailHandler := handlers.NewBulkEmailHandler(db.DB, emailService, announcementService)
 	eventTableHandler := handlers.NewEventTableHandler(eventTableService)
+	problemStatementHandler := handlers.NewProblemStatementHandler(problemStatementService)
+	checkPSHandler := handlers.NewCheckPSHandler(psSelectionService)
 
 	// Setup Gin router
 	if cfg.Environment == "production" {
@@ -141,12 +157,20 @@ func main() {
 			teams.GET("/:id", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.GetTeam)
 			teams.PUT("/:id/rsvp", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP)
 			teams.PUT("/:id/rsvp2", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP2)
+			teams.POST("/:id/lock-ps", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.LockPS)
 			// Team announcements (filtered by team) - must come after specific routes
 			teams.GET("/:id/announcements", announcementHandler.GetTeamAnnouncements)
 		}
 
 		// Dashboard route (public via token)
 		v1.GET("/dashboard/:token", teamHandler.GetDashboard)
+
+		// Problem statements (public; returns list only if released)
+		v1.GET("/problem-statements", problemStatementHandler.GetPublic)
+		// Serve uploaded PS PDFs (no auth; filename is UUID-based)
+		v1.GET("/uploads/problem-statements/:filename", problemStatementHandler.ServePDF)
+		// Check PS selections (public; shows checked_in teams and their PS choices)
+		v1.GET("/checkps", checkPSHandler.GetPSSelections)
 
 		// Public room view (seating layout + allocations by city and room name) — no auth
 		publicRoutes := v1.Group("/public")
@@ -266,6 +290,15 @@ func main() {
 			adminRoutes.DELETE("/volunteers/:id", volunteerAuthHandler.DeleteVolunteer)
 
 			// Event Table Management
+			adminRoutes.POST("/registration-desks/allocate", adminHandler.AllocateRegistrationDesks)
+			adminRoutes.POST("/registration-desks/clear", adminHandler.ClearAllRegistrationDesks)
+			adminRoutes.GET("/problem-statements", problemStatementHandler.ListAdmin)
+			adminRoutes.POST("/problem-statements", problemStatementHandler.CreateAdmin)
+			adminRoutes.DELETE("/problem-statements/:id", problemStatementHandler.DeleteAdmin)
+			adminRoutes.POST("/problem-statements/release-early", problemStatementHandler.ReleaseEarly)
+			adminRoutes.POST("/problem-statements/reset-release", problemStatementHandler.ResetRelease)
+			adminRoutes.GET("/problem-statements/submission-status", problemStatementHandler.GetSubmissionStatus)
+			adminRoutes.POST("/problem-statements/toggle-submission", problemStatementHandler.ToggleSubmissionWindow)
 			adminRoutes.POST("/tables", eventTableHandler.CreateEventTable)
 			adminRoutes.GET("/tables", eventTableHandler.GetAllEventTables)
 			adminRoutes.GET("/tables/:id", eventTableHandler.GetEventTable)

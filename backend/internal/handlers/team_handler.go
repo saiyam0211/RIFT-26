@@ -16,14 +16,18 @@ type TeamHandler struct {
 	jwtSecret              string
 	allowCityChange        bool
 	seatAllocationService  *services.SeatAllocationService
+	psSelectionService    *services.PSSelectionService
+	problemStatementService *services.ProblemStatementService
 }
 
-func NewTeamHandler(teamService *services.TeamService, jwtSecret string, allowCityChange bool, seatAllocationService *services.SeatAllocationService) *TeamHandler {
+func NewTeamHandler(teamService *services.TeamService, jwtSecret string, allowCityChange bool, seatAllocationService *services.SeatAllocationService, psSelectionService *services.PSSelectionService, problemStatementService *services.ProblemStatementService) *TeamHandler {
 	return &TeamHandler{
 		teamService:          teamService,
 		jwtSecret:            jwtSecret,
 		allowCityChange:      allowCityChange,
 		seatAllocationService: seatAllocationService,
+		psSelectionService:   psSelectionService,
+		problemStatementService: problemStatementService,
 	}
 }
 
@@ -141,11 +145,38 @@ func (h *TeamHandler) GetDashboard(c *gin.Context) {
 		seatAllocation = nil
 	}
 
+	// Problem statements: only visible to checked_in teams
+	var problemStatements interface{}
+	var psSubmissionOpen bool
+	var currentPSSelection interface{}
+	if team.Status == models.StatusCheckedIn {
+		// Check if PS are released
+		if released, _ := h.problemStatementService.IsReleased(c.Request.Context()); released {
+			if list, _, err := h.problemStatementService.ListPublic(c.Request.Context()); err == nil {
+				problemStatements = list
+			}
+		}
+		// Check submission window status
+		if open, _ := h.problemStatementService.IsSubmissionOpen(c.Request.Context()); open {
+			psSubmissionOpen = open
+		}
+		// Get current PS selection if any
+		if sel, err := h.psSelectionService.GetByTeamID(c.Request.Context(), team.ID); err == nil && sel != nil {
+			currentPSSelection = gin.H{
+				"problem_statement_id": sel.ProblemStatementID.String(),
+				"locked_at": sel.LockedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
+		}
+	}
+
 	c.JSON(200, gin.H{
-		"team":            team,
-		"announcements":   announcements,
-		"qr_code":         qrCode,
-		"seat_allocation": seatAllocation,
+		"team":                team,
+		"announcements":       announcements,
+		"qr_code":             qrCode,
+		"seat_allocation":     seatAllocation,
+		"problem_statements":  problemStatements,
+		"ps_submission_open":  psSubmissionOpen,
+		"ps_selection":        currentPSSelection,
 	})
 }
 
@@ -189,4 +220,33 @@ func (h *TeamHandler) SubmitRSVP2(c *gin.Context) {
 		"message": "RSVP II submitted successfully",
 		"team":    updatedTeam,
 	})
+}
+
+// LockPS locks a problem statement for the team (requires rsvp2_done, submission window open, leader email).
+// POST /api/v1/teams/:id/lock-ps
+func (h *TeamHandler) LockPS(c *gin.Context) {
+	teamIDStr := c.Param("id")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid team ID"})
+		return
+	}
+	var req struct {
+		ProblemStatementID string `json:"problem_statement_id" binding:"required"`
+		LeaderEmail        string `json:"leader_email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	psID, err := uuid.Parse(req.ProblemStatementID)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid problem statement ID"})
+		return
+	}
+	if err := h.psSelectionService.LockPS(c.Request.Context(), teamID, psID, req.LeaderEmail); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Problem statement locked successfully"})
 }

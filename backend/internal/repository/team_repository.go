@@ -129,22 +129,36 @@ func (r *TeamRepository) GetByQRToken(ctx context.Context, token string) (*model
 	return &team, nil
 }
 
-// GetByDashboardToken retrieves a team by dashboard token (for member access)
+// GetByDashboardToken retrieves a team by dashboard token (for member access).
+// Joins event_tables to return registration desk name/number when allocated.
 func (r *TeamRepository) GetByDashboardToken(ctx context.Context, token string) (*models.Team, error) {
 	query := `
-		SELECT id, team_name, city, status, problem_statement, qr_code_token,
-		       rsvp_locked, rsvp_locked_at, rsvp2_locked, rsvp2_locked_at, rsvp2_selected_members,
-		       checked_in_at, checked_in_by, dashboard_token, created_at, updated_at
-		FROM teams WHERE dashboard_token = $1
+		SELECT t.id, t.team_name, t.city, t.status, t.problem_statement, t.qr_code_token,
+		       t.rsvp_locked, t.rsvp_locked_at, t.rsvp2_locked, t.rsvp2_locked_at, t.rsvp2_selected_members,
+		       t.checked_in_at, t.checked_in_by, t.dashboard_token, t.created_at, t.updated_at,
+		       t.registration_desk_id, et.table_name AS registration_desk_table_name, et.table_number AS registration_desk_table_number
+		FROM teams t
+		LEFT JOIN event_tables et ON t.registration_desk_id = et.id
+		WHERE t.dashboard_token = $1
 	`
 	var team models.Team
+	var deskName, deskNumber sql.NullString
 	err := r.db.QueryRowContext(ctx, query, token).Scan(
 		&team.ID, &team.TeamName, &team.City, &team.Status,
 		&team.ProblemStatement, &team.QRCodeToken, &team.RSVPLocked,
 		&team.RSVPLockedAt, &team.RSVP2Locked, &team.RSVP2LockedAt, &team.RSVP2SelectedMembers,
-		&team.CheckedInAt, &team.CheckedInBy, &team.DashboardToken, 
+		&team.CheckedInAt, &team.CheckedInBy, &team.DashboardToken,
 		&team.CreatedAt, &team.UpdatedAt,
+		&team.RegistrationDeskID, &deskName, &deskNumber,
 	)
+	if err == nil {
+		if deskName.Valid {
+			team.RegistrationDeskTableName = &deskName.String
+		}
+		if deskNumber.Valid {
+			team.RegistrationDeskTableNumber = &deskNumber.String
+		}
+	}
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -170,6 +184,60 @@ func (r *TeamRepository) GetByDashboardToken(ctx context.Context, token string) 
 	}
 
 	return &team, nil
+}
+
+// GetTeamIDsByCity returns team IDs for teams in the given city with status rsvp2_done only (eligible for registration desk), ordered by created_at.
+func (r *TeamRepository) GetTeamIDsByCity(ctx context.Context, city string) ([]uuid.UUID, error) {
+	query := `
+		SELECT id FROM teams
+		WHERE city = $1 AND status = 'rsvp2_done'
+		ORDER BY created_at ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, city)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get team IDs by city: %w", err)
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan team ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating team IDs: %w", err)
+	}
+	return ids, nil
+}
+
+// SetRegistrationDesk sets the registration desk (event_table) for a team.
+func (r *TeamRepository) SetRegistrationDesk(ctx context.Context, teamID, deskID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE teams SET registration_desk_id = $1, updated_at = NOW() WHERE id = $2`, deskID, teamID)
+	if err != nil {
+		return fmt.Errorf("failed to set registration desk: %w", err)
+	}
+	return nil
+}
+
+// ClearRegistrationDesksForRSVP2Teams sets registration_desk_id = NULL for all teams with status = 'rsvp2_done'.
+// Call before re-running allocation so previous allocations are removed.
+func (r *TeamRepository) ClearRegistrationDesksForRSVP2Teams(ctx context.Context) (int64, error) {
+	res, err := r.db.ExecContext(ctx, `UPDATE teams SET registration_desk_id = NULL, updated_at = NOW() WHERE status = 'rsvp2_done'`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to clear registration desks: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+// ClearAllRegistrationDesks sets registration_desk_id = NULL for all teams that have a desk allocated.
+func (r *TeamRepository) ClearAllRegistrationDesks(ctx context.Context) (int64, error) {
+	res, err := r.db.ExecContext(ctx, `UPDATE teams SET registration_desk_id = NULL, updated_at = NOW() WHERE registration_desk_id IS NOT NULL`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to clear all registration desks: %w", err)
+	}
+	return res.RowsAffected()
 }
 
 // GetMembersByTeamID retrieves all members of a team

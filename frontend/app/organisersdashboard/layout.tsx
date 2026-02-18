@@ -14,7 +14,8 @@ import {
     User,
     Table,
     MapPin,
-    ShieldCheck
+    ShieldCheck,
+    FileText
 } from 'lucide-react';
 import { getAdminToken, getAdminUser, removeAdminToken } from '../../src/lib/admin-auth';
 
@@ -48,6 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Teams', path: '/organisersdashboard/teams', icon: Users },
         { name: 'Volunteers', path: '/organisersdashboard/volunteers', icon: Users },
         { name: 'Tables', path: '/organisersdashboard/tables', icon: Table },
+        { name: 'Problem Statements', path: '/organisersdashboard/problem-statements', icon: FileText },
         { name: 'Seat Allocation', path: '/organisersdashboard/seat-allocation', icon: MapPin },
         { name: 'Tickets', path: '/organisersdashboard/tickets', icon: Ticket },
         { name: 'Announcements', path: '/organisersdashboard/announcements', icon: Megaphone },

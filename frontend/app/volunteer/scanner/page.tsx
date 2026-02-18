@@ -492,7 +492,7 @@ export default function VolunteerScannerPage() {
                                             <p className="text-xs text-emerald-400 font-medium mb-2">✓ Seat Allocated — tell team:</p>
                                             <p className="text-sm font-semibold text-white">Block: {allocationResult[pending.team.id].block_name}</p>
                                             <p className="text-sm font-semibold text-white">Room: {allocationResult[pending.team.id].room_name}</p>
-                                            <p className="text-sm font-semibold text-white">Seat: {allocationResult[pending.team.id].seat_label}</p>
+                                            {/* <p className="text-sm font-semibold text-white">Seat: {allocationResult[pending.team.id].seat_label}</p> */}
                                             {allocationResult[pending.team.id].team_size && (
                                                 <p className="text-xs text-zinc-400 mt-1">Team size: {allocationResult[pending.team.id].team_size}</p>
                                             )}
@@ -710,7 +710,7 @@ export default function VolunteerScannerPage() {
                                         <p className="text-xs text-emerald-400 font-medium mb-2">✓ Seat Allocated — tell the team:</p>
                                         <p className="text-base font-semibold text-white mb-1">Block: {allocationResult[scannedTeam.id].block_name}</p>
                                         <p className="text-base font-semibold text-white mb-1">Room: {allocationResult[scannedTeam.id].room_name}</p>
-                                        <p className="text-base font-semibold text-white">Seat: {allocationResult[scannedTeam.id].seat_label}</p>
+                                        {/* <p className="text-base font-semibold text-white">Seat: {allocationResult[scannedTeam.id].seat_label}</p> */}
                                         {allocationResult[scannedTeam.id].team_size && (
                                             <p className="text-xs text-zinc-400 mt-2">Team size: {allocationResult[scannedTeam.id].team_size} participants</p>
                                         )}

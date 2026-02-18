@@ -12,6 +12,9 @@ export interface Team {
   rsvp2_selected_members?: string[]
   checked_in_at?: string
   dashboard_token?: string
+  registration_desk_id?: string
+  registration_desk_table_name?: string
+  registration_desk_table_number?: string
   created_at: string
   updated_at: string
   members?: TeamMember[]

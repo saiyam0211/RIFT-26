@@ -276,7 +276,7 @@ export default function VolunteerAdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 bg-zinc-900/50 sticky top-0 z-10">
+      <header className="border-b border-zinc-800 bg-zinc-900 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <ShieldCheck className="text-red-500" size={28} />
