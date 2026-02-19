@@ -56,6 +56,7 @@ func main() {
 	problemStatementRepo := repository.NewProblemStatementRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 	psSelectionRepo := repository.NewPSSelectionRepository(db)
+	psSubmissionRepo := repository.NewPSSubmissionRepository(db)
 
 	// Upload dir for problem statement PDFs
 	uploadDir := filepath.Join(".", "uploads", "problem_statements")
@@ -74,6 +75,7 @@ func main() {
 	registrationDeskAllocService := services.NewRegistrationDeskAllocationService(teamRepo, eventTableRepo)
 	problemStatementService := services.NewProblemStatementService(problemStatementRepo, settingsRepo, cfg.APIPublicURL, uploadDir)
 	psSelectionService := services.NewPSSelectionService(psSelectionRepo, teamRepo, problemStatementRepo, settingsRepo)
+	psSubmissionService := services.NewPSSubmissionService(psSubmissionRepo, psSelectionRepo, teamRepo, problemStatementRepo, settingsRepo)
 
 	// Initialize participant check-in repository
 	participantCheckinRepo := repository.NewParticipantCheckInRepository(db.DB)
@@ -101,6 +103,8 @@ func main() {
 	eventTableHandler := handlers.NewEventTableHandler(eventTableService)
 	problemStatementHandler := handlers.NewProblemStatementHandler(problemStatementService)
 	checkPSHandler := handlers.NewCheckPSHandler(psSelectionService)
+	psSubmissionHandler := handlers.NewPSSubmissionHandler(psSubmissionService)
+	judgingHandler := handlers.NewJudgingHandler(psSubmissionRepo)
 
 	// Setup Gin router
 	if cfg.Environment == "production" {
@@ -159,6 +163,9 @@ func main() {
 			teams.PUT("/:id/rsvp2", middleware.AuthMiddleware(cfg.JWTSecret), teamHandler.SubmitRSVP2)
 			// Lock PS is triggered from the public dashboard (no JWT), so do NOT wrap with AuthMiddleware.
 			teams.POST("/:id/lock-ps", teamHandler.LockPS)
+			// Final project submission portal (public from dashboard, backend enforces checked_in + locked PS)
+			teams.GET("/:id/submission", psSubmissionHandler.GetTeamForm)
+			teams.POST("/:id/submission", psSubmissionHandler.Submit)
 			// Team announcements (filtered by team) - must come after specific routes
 			teams.GET("/:id/announcements", announcementHandler.GetTeamAnnouncements)
 		}
@@ -172,6 +179,8 @@ func main() {
 		v1.GET("/uploads/problem-statements/:filename", problemStatementHandler.ServePDF)
 		// Check PS selections (public; shows checked_in teams and their PS choices)
 		v1.GET("/checkps", checkPSHandler.GetPSSelections)
+		// Judging: list all submissions with filters (city, problem_statement_id)
+		v1.GET("/judging/submissions", judgingHandler.GetSubmissions)
 
 		// Public room view (seating layout + allocations by city and room name) — no auth
 		publicRoutes := v1.Group("/public")
@@ -300,6 +309,8 @@ func main() {
 			adminRoutes.POST("/problem-statements/reset-release", problemStatementHandler.ResetRelease)
 			adminRoutes.GET("/problem-statements/submission-status", problemStatementHandler.GetSubmissionStatus)
 			adminRoutes.POST("/problem-statements/toggle-submission", problemStatementHandler.ToggleSubmissionWindow)
+			adminRoutes.GET("/problem-statements/final-submission-status", problemStatementHandler.GetFinalSubmissionStatus)
+			adminRoutes.POST("/problem-statements/toggle-final-submission", problemStatementHandler.ToggleFinalSubmissionPortal)
 			adminRoutes.POST("/tables", eventTableHandler.CreateEventTable)
 			adminRoutes.GET("/tables", eventTableHandler.GetAllEventTables)
 			adminRoutes.GET("/tables/:id", eventTableHandler.GetEventTable)

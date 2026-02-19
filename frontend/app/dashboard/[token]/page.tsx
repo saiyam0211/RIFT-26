@@ -26,6 +26,24 @@ export default function DashboardPage() {
     const [leaderEmail, setLeaderEmail] = useState('')
     const [lockingPS, setLockingPS] = useState(false)
     const [qrCodeData, setQRCodeData] = useState('')
+    const [submissionAllowed, setSubmissionAllowed] = useState(false)
+    const [submissionPortalOpen, setSubmissionPortalOpen] = useState(false)
+    const [submission, setSubmission] = useState<{ 
+        linkedin_url?: string; 
+        github_url?: string; 
+        live_url?: string; 
+        extra_notes?: string;
+        custom_field_values?: Record<string, string>;
+    }>({})
+    const [submissionFields, setSubmissionFields] = useState<{
+        linkedin?: boolean;
+        github?: boolean;
+        live?: boolean;
+        extra_notes?: boolean;
+        custom_fields?: Array<{ key: string; label: string }>;
+    }>({})
+    const [showSubmissionModal, setShowSubmissionModal] = useState(false)
+    const [submittingProject, setSubmittingProject] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [showQRModal, setShowQRModal] = useState(false)
@@ -45,7 +63,9 @@ export default function DashboardPage() {
     const fetchDashboard = async () => {
         try {
             const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/${token}`)
-            setTeam(response.data.team)
+            const teamData = response.data.team
+
+            setTeam(teamData)
             setAnnouncements(response.data.announcements || [])
             setSeatAllocation(response.data.seat_allocation || null)
 
@@ -56,10 +76,10 @@ export default function DashboardPage() {
             }
 
             // QR code data is the QR token wrapped in JSON
-            if (response.data.team.qr_code_token) {
+            if (teamData.qr_code_token) {
                 const qrData = JSON.stringify({
-                    team_id: response.data.team.id,
-                    token: response.data.team.qr_code_token,
+                    team_id: teamData.id,
+                    token: teamData.qr_code_token,
                     type: 'team',
                 })
                 setQRCodeData(qrData)
@@ -78,7 +98,7 @@ export default function DashboardPage() {
                 setFinalMode(mode)
 
                 // If final confirmation is closed and team is only RSVP I done, show modal
-                if (mode === 'false' && response.data.team.status === 'rsvp_done') {
+                if (mode === 'false' && teamData.status === 'rsvp_done') {
                     setShowFinalClosedModal(true)
                 }
             } catch (e) {
@@ -93,6 +113,29 @@ export default function DashboardPage() {
             setPsSubmissionOpen(response.data.ps_submission_open === true)
             if (response.data.ps_selection) {
                 setPsSelection(response.data.ps_selection)
+            }
+
+            // After basic dashboard load, fetch submission form for this team
+            try {
+                const subRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/teams/${teamData.id}/submission`)
+                setSubmissionPortalOpen(subRes.data.portal_open === true)
+                setSubmissionAllowed(subRes.data.allowed === true)
+                if (subRes.data) {
+                    setSubmissionFields(subRes.data.fields || {})
+                    const customFieldValues: Record<string, string> = {}
+                    if (subRes.data.custom_field_values) {
+                        Object.assign(customFieldValues, subRes.data.custom_field_values)
+                    }
+                    setSubmission({
+                        linkedin_url: subRes.data.linkedin_url || '',
+                        github_url: subRes.data.github_url || '',
+                        live_url: subRes.data.live_url || '',
+                        extra_notes: subRes.data.extra_notes || '',
+                        custom_field_values: customFieldValues,
+                    })
+                }
+            } catch {
+                // ignore submission fetch errors on dashboard
             }
 
             setLoading(false)
@@ -162,6 +205,35 @@ export default function DashboardPage() {
             alert(err.response?.data?.error || 'Failed to lock problem statement')
         } finally {
             setLockingPS(false)
+        }
+    }
+
+    const handleSubmitProject = async () => {
+        if (!team?.id) return
+        setSubmittingProject(true)
+        try {
+            const payload: Record<string, unknown> = {
+                linkedin_url: submission.linkedin_url ?? '',
+                github_url: submission.github_url ?? '',
+                live_url: submission.live_url ?? '',
+                extra_notes: submission.extra_notes ?? '',
+            }
+            if (submission.custom_field_values && Object.keys(submission.custom_field_values).length > 0) {
+                payload.custom_field_values = submission.custom_field_values
+            }
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
+            const res = await axios.post(`${apiUrl}/teams/${team.id}/submission`, payload, {
+                headers: { 'Content-Type': 'application/json' },
+            })
+            if (res.data?.message) {
+                alert('Submission saved successfully!')
+                setShowSubmissionModal(false)
+            }
+        } catch (err: any) {
+            const msg = err.response?.data?.error ?? err.message ?? 'Failed to save submission'
+            alert(msg)
+        } finally {
+            setSubmittingProject(false)
         }
     }
 
@@ -508,6 +580,123 @@ export default function DashboardPage() {
                 </div>
             )}
 
+            {/* Project Submission Modal (read-only View when already submitted, else editable form) */}
+            {showSubmissionModal && (() => {
+                const hasSubmitted = !!(submission.linkedin_url || submission.github_url || submission.live_url || submission.extra_notes || (submission.custom_field_values && Object.values(submission.custom_field_values).some(Boolean)))
+                return (
+                <div
+                    className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+                    onClick={(e) => e.target === e.currentTarget && setShowSubmissionModal(false)}
+                >
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-white text-xl font-semibold flex items-center gap-2">
+                                <Lock className="text-emerald-400" size={24} />
+                                Final Project Submission
+                            </h3>
+                            <button
+                                onClick={() => setShowSubmissionModal(false)}
+                                className="text-gray-400 hover:text-white transition"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            {!hasSubmitted && (
+                                <p className="text-gray-300 text-sm">
+                                    Share your final links for evaluation. Submissions cannot be edited after saving.
+                                </p>
+                            )}
+                            {submissionFields.linkedin && (
+                                <div>
+                                    <label className="text-gray-300 text-sm mb-2 block">LinkedIn video URL</label>
+                                    <input
+                                        type="url"
+                                        readOnly={hasSubmitted}
+                                        value={submission.linkedin_url || ''}
+                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, linkedin_url: e.target.value }))}
+                                        placeholder="https://www.linkedin.com/..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
+                                    />
+                                </div>
+                            )}
+                            {submissionFields.github && (
+                                <div>
+                                    <label className="text-gray-300 text-sm mb-2 block">GitHub repository URL</label>
+                                    <input
+                                        type="url"
+                                        readOnly={hasSubmitted}
+                                        value={submission.github_url || ''}
+                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, github_url: e.target.value }))}
+                                        placeholder="https://github.com/..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
+                                    />
+                                </div>
+                            )}
+                            {submissionFields.live && (
+                                <div>
+                                    <label className="text-gray-300 text-sm mb-2 block">Live demo / project URL</label>
+                                    <input
+                                        type="url"
+                                        readOnly={hasSubmitted}
+                                        value={submission.live_url || ''}
+                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, live_url: e.target.value }))}
+                                        placeholder="https://..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
+                                    />
+                                </div>
+                            )}
+                            {submissionFields.extra_notes && (
+                                <div>
+                                    <label className="text-gray-300 text-sm mb-2 block">Extra notes (optional)</label>
+                                    <textarea
+                                        rows={4}
+                                        readOnly={hasSubmitted}
+                                        value={submission.extra_notes || ''}
+                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, extra_notes: e.target.value }))}
+                                        placeholder="Anything you want the judges to know..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 resize-none disabled:opacity-80"
+                                    />
+                                </div>
+                            )}
+                            {submissionFields.custom_fields && submissionFields.custom_fields.length > 0 && (
+                                <>
+                                    {submissionFields.custom_fields.map((field) => (
+                                        <div key={field.key}>
+                                            <label className="text-gray-300 text-sm mb-2 block">{field.label}</label>
+                                            <input
+                                                type="text"
+                                                readOnly={hasSubmitted}
+                                                value={submission.custom_field_values?.[field.key] || ''}
+                                                onChange={(e) => !hasSubmitted && setSubmission((prev) => ({
+                                                    ...prev,
+                                                    custom_field_values: {
+                                                        ...(prev.custom_field_values || {}),
+                                                        [field.key]: e.target.value,
+                                                    },
+                                                }))}
+                                                placeholder={`Enter ${field.label.toLowerCase()}...`}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
+                                            />
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+                            {!hasSubmitted && (
+                                <button
+                                    onClick={handleSubmitProject}
+                                    disabled={submittingProject}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-lg transition font-medium"
+                                >
+                                    {submittingProject ? 'Saving...' : 'Save submission'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                )
+            })()}
+
             {/* Left Side - Fixed Title, Team Name, and QR Code */}
             <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 mt-10 py-8 lg:ml-20 lg:px-16 lg:py-12 lg:fixed lg:left-0 lg:top-0 lg:h-screen">
                 <div className="space-y-8 lg:space-y-12">
@@ -665,6 +854,26 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Final Project Submission (only when portal open and team allowed) */}
+                    {submissionPortalOpen && submissionAllowed && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-emerald-300 font-semibold">Final project submission</p>
+                                    <p className="text-zinc-400 text-sm">
+                                        Submit your LinkedIn video, GitHub repo and live demo link for your locked problem statement.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowSubmissionModal(true)}
+                                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
+                                >
+                                    {submission.linkedin_url || submission.github_url || submission.live_url || submission.extra_notes || (submission.custom_field_values && Object.values(submission.custom_field_values).some(Boolean)) ? 'View' : 'Open form'}
+                                </button>
+                            </div>
                         </div>
                     )}
 

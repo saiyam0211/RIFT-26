@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -55,7 +56,33 @@ func (h *ProblemStatementHandler) ListAdmin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"problem_statements": list})
+	// Convert PSItem list to response format with parsed submission_fields
+	type PSResponse struct {
+		ID               string                 `json:"id"`
+		Track            string                 `json:"track"`
+		Name             string                 `json:"name"`
+		FilePath         string                 `json:"file_path"`
+		SubmissionFields map[string]interface{} `json:"submission_fields,omitempty"`
+		CreatedAt        string                 `json:"created_at"`
+	}
+	response := make([]PSResponse, 0, len(list))
+	for _, ps := range list {
+		res := PSResponse{
+			ID:        ps.ID.String(),
+			Track:     ps.Track,
+			Name:      ps.Name,
+			FilePath:  ps.FilePath,
+			CreatedAt: ps.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if ps.SubmissionFields.Valid && ps.SubmissionFields.String != "" {
+			var fields map[string]interface{}
+			if err := json.Unmarshal([]byte(ps.SubmissionFields.String), &fields); err == nil {
+				res.SubmissionFields = fields
+			}
+		}
+		response = append(response, res)
+	}
+	c.JSON(http.StatusOK, gin.H{"problem_statements": response})
 }
 
 // CreateAdmin creates a problem statement with a Google Drive (or any) PDF link (admin).
@@ -64,6 +91,7 @@ func (h *ProblemStatementHandler) CreateAdmin(c *gin.Context) {
 	track := strings.TrimSpace(c.PostForm("track"))
 	name := strings.TrimSpace(c.PostForm("name"))
 	link := strings.TrimSpace(c.PostForm("link"))
+	submissionFieldsJSON := strings.TrimSpace(c.PostForm("submission_fields"))
 	if track == "" || name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "track and name are required"})
 		return
@@ -82,12 +110,34 @@ func (h *ProblemStatementHandler) CreateAdmin(c *gin.Context) {
 		return
 	}
 	// Store the full URL in file_path (used as download URL when it's a link)
-	ps, err := h.service.Create(c.Request.Context(), track, name, link)
+	ps, err := h.service.Create(c.Request.Context(), track, name, link, submissionFieldsJSON)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, ps)
+	// Return in same format as ListAdmin
+	type PSResponse struct {
+		ID               string                 `json:"id"`
+		Track            string                 `json:"track"`
+		Name             string                 `json:"name"`
+		FilePath         string                 `json:"file_path"`
+		SubmissionFields map[string]interface{} `json:"submission_fields,omitempty"`
+		CreatedAt        string                 `json:"created_at"`
+	}
+	res := PSResponse{
+		ID:        ps.ID.String(),
+		Track:     ps.Track,
+		Name:      ps.Name,
+		FilePath:  ps.FilePath,
+		CreatedAt: ps.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+	if ps.SubmissionFields.Valid && ps.SubmissionFields.String != "" {
+		var fields map[string]interface{}
+		if err := json.Unmarshal([]byte(ps.SubmissionFields.String), &fields); err == nil {
+			res.SubmissionFields = fields
+		}
+	}
+	c.JSON(http.StatusCreated, res)
 }
 
 // DeleteAdmin deletes a problem statement (admin).
@@ -156,4 +206,36 @@ func (h *ProblemStatementHandler) ToggleSubmissionWindow(c *gin.Context) {
 		status = "unlocked"
 	}
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("PS submission window %s", status), "submission_open": req.Open})
+}
+
+// GetFinalSubmissionStatus returns the final submission portal status (admin).
+// GET /api/v1/admin/problem-statements/final-submission-status
+func (h *ProblemStatementHandler) GetFinalSubmissionStatus(c *gin.Context) {
+	open, err := h.service.IsFinalSubmissionOpen(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"portal_open": open})
+}
+
+// ToggleFinalSubmissionPortal opens/closes the final submission portal (admin).
+// POST /api/v1/admin/problem-statements/toggle-final-submission
+func (h *ProblemStatementHandler) ToggleFinalSubmissionPortal(c *gin.Context) {
+	var req struct {
+		Open bool `json:"open"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	if err := h.service.SetFinalSubmissionOpen(c.Request.Context(), req.Open); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	status := "closed"
+	if req.Open {
+		status = "opened"
+	}
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Final submission portal %s", status), "portal_open": req.Open})
 }

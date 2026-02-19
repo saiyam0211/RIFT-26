@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -16,7 +17,8 @@ import (
 var defaultReleaseTime = time.Date(2026, 2, 19, 5, 30, 0, 0, time.UTC)
 
 const settingKeyPSReleasedAt = "ps_released_at"
-const settingKeyPSSubmissionOpen = "ps_submission_open" // "true" or "false"
+const settingKeyPSSubmissionOpen = "ps_submission_open"             // "true" or "false" (locking window)
+const settingKeyPSFinalSubmissionOpen = "ps_final_submission_open" // "true" or "false" (project submission portal)
 
 type ProblemStatementService struct {
 	repo       *repository.ProblemStatementRepository
@@ -91,8 +93,21 @@ func (s *ProblemStatementService) ListAdmin(ctx context.Context) ([]models.PSIte
 }
 
 // Create saves a new problem statement (track, name, file path after upload).
-func (s *ProblemStatementService) Create(ctx context.Context, track, name, filePath string) (*models.PSItem, error) {
-	ps := &models.PSItem{Track: track, Name: name, FilePath: filePath}
+// submissionFieldsJSON is an optional JSON object describing which final submission fields are expected.
+func (s *ProblemStatementService) Create(ctx context.Context, track, name, filePath, submissionFieldsJSON string) (*models.PSItem, error) {
+	// If no explicit config is provided, default to enabling all standard fields.
+	if strings.TrimSpace(submissionFieldsJSON) == "" {
+		submissionFieldsJSON = `{"linkedin":true,"github":true,"live":true,"extra_notes":true}`
+	}
+	ps := &models.PSItem{
+		Track:    track,
+		Name:     name,
+		FilePath: filePath,
+		SubmissionFields: sql.NullString{
+			String: submissionFieldsJSON,
+			Valid:  submissionFieldsJSON != "",
+		},
+	}
 	if err := s.repo.Create(ctx, ps); err != nil {
 		return nil, fmt.Errorf("create problem statement: %w", err)
 	}
@@ -125,4 +140,22 @@ func (s *ProblemStatementService) SetSubmissionOpen(ctx context.Context, open bo
 		val = "true"
 	}
 	return s.settingsRepo.Set(ctx, settingKeyPSSubmissionOpen, val)
+}
+
+// IsFinalSubmissionOpen returns true if the final submission portal is open.
+func (s *ProblemStatementService) IsFinalSubmissionOpen(ctx context.Context) (bool, error) {
+	val, err := s.settingsRepo.Get(ctx, settingKeyPSFinalSubmissionOpen)
+	if err != nil {
+		return false, err
+	}
+	return val == "true", nil
+}
+
+// SetFinalSubmissionOpen opens/closes the final submission portal.
+func (s *ProblemStatementService) SetFinalSubmissionOpen(ctx context.Context, open bool) error {
+	val := "false"
+	if open {
+		val = "true"
+	}
+	return s.settingsRepo.Set(ctx, settingKeyPSFinalSubmissionOpen, val)
 }
