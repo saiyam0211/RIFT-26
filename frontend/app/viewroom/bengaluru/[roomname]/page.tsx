@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
+const POLL_INTERVAL_MS = 8000
 
 type LayoutShape = {
   rows: number
@@ -31,41 +32,59 @@ export default function ViewRoomPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!roomname) {
-      setLoading(false)
-      setError('Room name missing')
-      return
+  const fetchRoom = useCallback((isInitial = false) => {
+    if (!roomname) return
+    if (isInitial) {
+      setLoading(true)
+      setError(null)
     }
-    let cancelled = false
-    setLoading(true)
-    setError(null)
     fetch(`${API}/public/viewroom/bengaluru/${encodeURIComponent(roomname)}`)
       .then((res) => {
         if (!res.ok) throw new Error(res.status === 404 ? 'Room not found' : 'Failed to load room')
         return res.json()
       })
       .then((json) => {
-        if (!cancelled) {
-          setData({
-            room_name: json.room_name || '',
-            block_name: json.block_name,
-            layout: json.layout || null,
-            allocations: json.allocations || [],
-          })
-          if (typeof document !== 'undefined') {
-            document.title = `${json.room_name || 'Room'} — Bengaluru | RIFT '26`
-          }
+        setData({
+          room_name: json.room_name || '',
+          block_name: json.block_name,
+          layout: json.layout || null,
+          allocations: json.allocations || [],
+        })
+        if (typeof document !== 'undefined') {
+          document.title = `${json.room_name || 'Room'} — Bengaluru | RIFT '26`
         }
       })
       .catch((e) => {
-        if (!cancelled) setError(e.message || 'Failed to load')
+        if (isInitial) setError(e.message || 'Failed to load')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (isInitial) setLoading(false)
       })
-    return () => { cancelled = true }
   }, [roomname])
+
+  // Initial load + polling so the view updates automatically without refresh
+  useEffect(() => {
+    if (!roomname) {
+      setLoading(false)
+      setError('Room name missing')
+      return
+    }
+    fetchRoom(true)
+    const interval = setInterval(() => fetchRoom(false), POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [roomname, fetchRoom])
+
+  // Refetch when tab becomes visible so returning to the tab shows latest data
+  useEffect(() => {
+    if (!roomname) return
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchRoom(false)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [roomname, fetchRoom])
 
   if (loading) {
     return (
