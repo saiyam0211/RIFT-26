@@ -57,6 +57,7 @@ func (s *PSSubmissionService) SetPortalOpen(ctx context.Context, open bool) erro
 type PSSubmissionForm struct {
 	Allowed           bool                     `json:"allowed"`
 	PortalOpen        bool                     `json:"portal_open"`
+	Submitted         bool                     `json:"submitted"` // true when team has already saved a submission (read-only form)
 	ProblemName       string                   `json:"problem_name,omitempty"`
 	LinkedinURL       string                   `json:"linkedin_url,omitempty"`
 	GithubURL         string                   `json:"github_url,omitempty"`
@@ -133,6 +134,7 @@ func (s *PSSubmissionService) GetTeamForm(ctx context.Context, teamID uuid.UUID)
 	// Existing submission if any
 	existing, err := s.subRepo.GetByTeamAndPS(ctx, teamID, sel.ProblemStatementID)
 	if err == nil && existing != nil {
+		form.Submitted = true
 		form.LinkedinURL = existing.LinkedinURL
 		form.GithubURL = existing.GithubURL
 		form.LiveURL = existing.LiveURL

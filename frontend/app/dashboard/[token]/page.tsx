@@ -43,6 +43,7 @@ export default function DashboardPage() {
         custom_fields?: Array<{ key: string; label: string }>;
     }>({})
     const [showSubmissionModal, setShowSubmissionModal] = useState(false)
+    const [projectSubmissionSaved, setProjectSubmissionSaved] = useState(false) // true only after server confirms save (not from typing)
     const [submittingProject, setSubmittingProject] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -120,6 +121,7 @@ export default function DashboardPage() {
                 const subRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/teams/${teamData.id}/submission`)
                 setSubmissionPortalOpen(subRes.data.portal_open === true)
                 setSubmissionAllowed(subRes.data.allowed === true)
+                setProjectSubmissionSaved(subRes.data.submitted === true)
                 if (subRes.data) {
                     setSubmissionFields(subRes.data.fields || {})
                     const customFieldValues: Record<string, string> = {}
@@ -226,6 +228,7 @@ export default function DashboardPage() {
                 headers: { 'Content-Type': 'application/json' },
             })
             if (res.data?.message) {
+                setProjectSubmissionSaved(true)
                 alert('Submission saved successfully!')
                 setShowSubmissionModal(false)
             }
@@ -580,16 +583,16 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            {/* Project Submission Modal (read-only View when already submitted, else editable form) */}
+            {/* Project Submission Modal (read-only when already saved to server, else editable; submit button always visible) */}
             {showSubmissionModal && (() => {
-                const hasSubmitted = !!(submission.linkedin_url || submission.github_url || submission.live_url || submission.extra_notes || (submission.custom_field_values && Object.values(submission.custom_field_values).some(Boolean)))
+                const isReadOnly = projectSubmissionSaved
                 return (
                 <div
                     className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
                     onClick={(e) => e.target === e.currentTarget && setShowSubmissionModal(false)}
                 >
-                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-xl">
+                        <div className="flex items-center justify-between p-6 pb-4 shrink-0">
                             <h3 className="text-white text-xl font-semibold flex items-center gap-2">
                                 <Lock className="text-emerald-400" size={24} />
                                 Final Project Submission
@@ -601,8 +604,8 @@ export default function DashboardPage() {
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="space-y-4">
-                            {!hasSubmitted && (
+                        <div className="flex-1 min-h-0 overflow-y-auto px-6 space-y-4">
+                            {!isReadOnly && (
                                 <p className="text-gray-300 text-sm">
                                     Share your final links for evaluation. Submissions cannot be edited after saving.
                                 </p>
@@ -612,9 +615,9 @@ export default function DashboardPage() {
                                     <label className="text-gray-300 text-sm mb-2 block">LinkedIn video URL</label>
                                     <input
                                         type="url"
-                                        readOnly={hasSubmitted}
+                                        readOnly={isReadOnly}
                                         value={submission.linkedin_url || ''}
-                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, linkedin_url: e.target.value }))}
+                                        onChange={(e) => !isReadOnly && setSubmission((prev) => ({ ...prev, linkedin_url: e.target.value }))}
                                         placeholder="https://www.linkedin.com/..."
                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
                                     />
@@ -625,9 +628,9 @@ export default function DashboardPage() {
                                     <label className="text-gray-300 text-sm mb-2 block">GitHub repository URL</label>
                                     <input
                                         type="url"
-                                        readOnly={hasSubmitted}
+                                        readOnly={isReadOnly}
                                         value={submission.github_url || ''}
-                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, github_url: e.target.value }))}
+                                        onChange={(e) => !isReadOnly && setSubmission((prev) => ({ ...prev, github_url: e.target.value }))}
                                         placeholder="https://github.com/..."
                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
                                     />
@@ -638,9 +641,9 @@ export default function DashboardPage() {
                                     <label className="text-gray-300 text-sm mb-2 block">Live demo / project URL</label>
                                     <input
                                         type="url"
-                                        readOnly={hasSubmitted}
+                                        readOnly={isReadOnly}
                                         value={submission.live_url || ''}
-                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, live_url: e.target.value }))}
+                                        onChange={(e) => !isReadOnly && setSubmission((prev) => ({ ...prev, live_url: e.target.value }))}
                                         placeholder="https://..."
                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-80"
                                     />
@@ -651,9 +654,9 @@ export default function DashboardPage() {
                                     <label className="text-gray-300 text-sm mb-2 block">Extra notes (optional)</label>
                                     <textarea
                                         rows={4}
-                                        readOnly={hasSubmitted}
+                                        readOnly={isReadOnly}
                                         value={submission.extra_notes || ''}
-                                        onChange={(e) => !hasSubmitted && setSubmission((prev) => ({ ...prev, extra_notes: e.target.value }))}
+                                        onChange={(e) => !isReadOnly && setSubmission((prev) => ({ ...prev, extra_notes: e.target.value }))}
                                         placeholder="Anything you want the judges to know..."
                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 resize-none disabled:opacity-80"
                                     />
@@ -666,9 +669,9 @@ export default function DashboardPage() {
                                             <label className="text-gray-300 text-sm mb-2 block">{field.label}</label>
                                             <input
                                                 type="text"
-                                                readOnly={hasSubmitted}
+                                                readOnly={isReadOnly}
                                                 value={submission.custom_field_values?.[field.key] || ''}
-                                                onChange={(e) => !hasSubmitted && setSubmission((prev) => ({
+                                                onChange={(e) => !isReadOnly && setSubmission((prev) => ({
                                                     ...prev,
                                                     custom_field_values: {
                                                         ...(prev.custom_field_values || {}),
@@ -682,7 +685,9 @@ export default function DashboardPage() {
                                     ))}
                                 </>
                             )}
-                            {!hasSubmitted && (
+                        </div>
+                        {!isReadOnly && (
+                            <div className="p-6 pt-4 border-t border-white/10 shrink-0">
                                 <button
                                     onClick={handleSubmitProject}
                                     disabled={submittingProject}
@@ -690,8 +695,8 @@ export default function DashboardPage() {
                                 >
                                     {submittingProject ? 'Saving...' : 'Save submission'}
                                 </button>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
                 )
