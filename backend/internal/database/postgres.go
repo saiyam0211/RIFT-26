@@ -14,10 +14,31 @@ type DB struct {
 
 // ensureProblemStatementSubmissionFields adds submission_fields column if missing (idempotent).
 func ensureProblemStatementSubmissionFields(db *sql.DB) {
-	_, err := db.Exec(`ALTER TABLE problem_statements ADD COLUMN IF NOT EXISTS submission_fields JSONB`)
-	if err != nil {
+	if _, err := db.Exec(`ALTER TABLE problem_statements ADD COLUMN IF NOT EXISTS submission_fields JSONB`); err != nil {
 		log.Printf("[migration] problem_statements.submission_fields: %v", err)
-		return
+	}
+}
+
+// ensurePSSelectionsTable creates ps_selections table if missing (idempotent).
+func ensurePSSelectionsTable(db *sql.DB) {
+	const ddl = `
+CREATE TABLE IF NOT EXISTS ps_selections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    problem_statement_id UUID NOT NULL REFERENCES problem_statements(id) ON DELETE CASCADE,
+    leader_email VARCHAR(255) NOT NULL,
+    locked_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(team_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ps_selections_team ON ps_selections(team_id);
+CREATE INDEX IF NOT EXISTS idx_ps_selections_ps ON ps_selections(problem_statement_id);
+CREATE INDEX IF NOT EXISTS idx_ps_selections_locked ON ps_selections(locked_at);
+`
+	if _, err := db.Exec(ddl); err != nil {
+		log.Printf("[migration] ps_selections: %v", err)
 	}
 }
 
@@ -33,6 +54,8 @@ func NewPostgresDB(databaseURL string) (*DB, error) {
 
 	// Ensure problem_statements has submission_fields (safe if column already exists)
 	ensureProblemStatementSubmissionFields(db)
+	// Ensure ps_selections table exists for PS locking
+	ensurePSSelectionsTable(db)
 
 	// Set connection pool settings
 	db.SetMaxOpenConns(25)
