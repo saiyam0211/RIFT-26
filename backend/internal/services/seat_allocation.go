@@ -44,10 +44,10 @@ func (s *SeatAllocationService) AllocateSeat(teamID uuid.UUID, volunteerID uuid.
 	}
 	if teamSize == 0 {
 		tx.Rollback()
-		return nil, errors.New("no participants checked in for this team")
+		return nil, errors.New("team size could not be determined (member_count or team_members is empty)")
 	}
 
-	// Try preferred block first; if full or no seats, try any block
+	// Try preferred block first; if no merged cell for this team size in that block, try next blocks (any block in order)
 	seats, err := s.findBestAvailableSeats(tx, teamSize, preferredBlockName)
 	if err != nil && preferredBlockName != nil && *preferredBlockName != "" {
 		seats, err = s.findBestAvailableSeats(tx, teamSize, nil)
@@ -201,18 +201,24 @@ func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int
 	return []*models.Seat{&seat}, nil
 }
 
-// getTeamSize counts checked-in participants for a team
+// getTeamSize returns the team's original size (member_count) for seat allocation.
+// Allocation is based on registered team size, not how many participants checked in.
 func (s *SeatAllocationService) getTeamSize(tx *gorm.DB, teamID uuid.UUID) (int, error) {
-	var count int64
-
-	// Count checked-in participants using raw SQL (ParticipantCheckIn is not a GORM model)
-	err := tx.Raw("SELECT COUNT(*) FROM participant_check_ins WHERE team_id = ?", teamID).Scan(&count).Error
-
+	var team models.Team
+	err := tx.Select("member_count").First(&team, teamID).Error
 	if err != nil {
 		return 0, err
 	}
-
-	return int(count), nil
+	size := team.MemberCount
+	if size <= 0 {
+		// Fallback: count team_members if member_count not set
+		var count int64
+		if err := tx.Table("team_members").Where("team_id = ?", teamID).Count(&count).Error; err != nil {
+			return 0, err
+		}
+		size = int(count)
+	}
+	return size, nil
 }
 
 // GetTeamAllocation retrieves the seat allocation for a team

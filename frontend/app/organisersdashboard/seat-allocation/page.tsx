@@ -1005,7 +1005,8 @@ export default function SeatAllocationPage() {
                                                         style={{
                                                             gridTemplateRows: `repeat(${canvasRows}, 32px)`,
                                                             gridTemplateColumns: `24px repeat(${canvasCols}, 32px)`,
-                                                            alignItems: 'center'
+                                                            alignItems: 'stretch',
+                                                            alignContent: 'start',
                                                         }}
                                                     >
                                                         {/* Row labels */}
@@ -1132,6 +1133,8 @@ export default function SeatAllocationPage() {
                                                                     style={{
                                                                         gridRow: `${minRow} / ${maxRow + 1}`,
                                                                         gridColumn: `${minCol + 1} / ${maxCol + 2}`,
+                                                                        alignSelf: 'stretch',
+                                                                        minHeight: 0,
                                                                     }}
                                                                     title={`Merged seats (${positions.length} seats)`}
                                                                 >
@@ -1216,7 +1219,8 @@ export default function SeatAllocationPage() {
                                     style={{
                                         gridTemplateRows: `repeat(${roomViewData.layout?.rows || canvasRows}, 32px)`,
                                         gridTemplateColumns: `repeat(${roomViewData.layout?.cols || canvasCols}, 32px)`,
-                                        alignItems: 'center'
+                                        alignItems: 'stretch',
+                                        alignContent: 'start',
                                     }}
                                 >
                                     {(() => {
@@ -1289,6 +1293,8 @@ export default function SeatAllocationPage() {
                                                             style={{
                                                                 gridRow: `${minRow} / ${maxRow + 1}`,
                                                                 gridColumn: `${minCol} / ${maxCol + 1}`,
+                                                                alignSelf: 'stretch',
+                                                                minHeight: 0,
                                                             }}
                                                         >
                                                             <span className="text-center">
@@ -1324,6 +1330,8 @@ export default function SeatAllocationPage() {
                                                             style={{
                                                                 gridRow: `${minR} / ${maxR + 1}`,
                                                                 gridColumn: `${minC} / ${maxC + 1}`,
+                                                                alignSelf: 'stretch',
+                                                                minHeight: 0,
                                                             }}
                                                             title={`${a.team_name || 'Team'} — Seat: ${a.seat_label}${roomViewData?.room_name ? ` — Room: ${roomViewData.room_name}` : ''}`}
                                                         >
