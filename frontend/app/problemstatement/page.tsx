@@ -6,8 +6,8 @@ import RIFTBackground from '@/components/RIFTBackground'
 import { FileDown, RotateCcw } from 'lucide-react'
 import { getAdminToken } from '@/src/lib/admin-auth'
 
-// 19 Feb 2026 11:30 AM IST = 06:00 UTC
-const RELEASE_TIME = new Date(Date.UTC(2026, 1, 19, 6, 0, 0))
+// 19 Feb 2026 11:45 AM IST = 06:15 UTC
+const RELEASE_TIME = new Date(Date.UTC(2026, 1, 19, 6, 15, 0))
 
 interface PSItem {
   id: string
