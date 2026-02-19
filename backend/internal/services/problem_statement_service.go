@@ -13,8 +13,8 @@ import (
 	"github.com/rift26/backend/internal/repository"
 )
 
-// PS release: 19 Feb 2026 11:00 AM IST = 2026-02-19 05:30 UTC
-var defaultReleaseTime = time.Date(2026, 2, 19, 5, 30, 0, 0, time.UTC)
+// PS release: 19 Feb 2026 11:30 AM IST = 2026-02-19 06:00 UTC
+var defaultReleaseTime = time.Date(2026, 2, 19, 6, 0, 0, 0, time.UTC)
 
 const settingKeyPSReleasedAt = "ps_released_at"
 const settingKeyPSSubmissionOpen = "ps_submission_open"             // "true" or "false" (locking window)
@@ -31,7 +31,7 @@ func NewProblemStatementService(repo *repository.ProblemStatementRepository, set
 	return &ProblemStatementService{repo: repo, settingsRepo: settingsRepo, baseURL: baseURL, uploadDir: uploadDir}
 }
 
-// IsReleased returns true if problem statements should be visible (after 19 Feb 2026 11 AM IST or early release).
+// IsReleased returns true if problem statements should be visible (after 19 Feb 2026 11:30 AM IST or early release).
 func (s *ProblemStatementService) IsReleased(ctx context.Context) (bool, error) {
 	val, err := s.settingsRepo.Get(ctx, settingKeyPSReleasedAt)
 	if err != nil {

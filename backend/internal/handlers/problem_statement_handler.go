@@ -21,7 +21,7 @@ func NewProblemStatementHandler(service *services.ProblemStatementService) *Prob
 	return &ProblemStatementHandler{service: service}
 }
 
-// GetPublic returns problem statements for the public only if released (11 AM 19 Feb or after early release).
+// GetPublic returns problem statements for the public only if released (11:30 AM 19 Feb or after early release).
 // GET /api/v1/problem-statements
 func (h *ProblemStatementHandler) GetPublic(c *gin.Context) {
 	list, released, err := h.service.ListPublic(c.Request.Context())
@@ -173,7 +173,7 @@ func (h *ProblemStatementHandler) ResetRelease(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Release reset. Timer will show until 11 AM 19 Feb or release early again."})
+	c.JSON(http.StatusOK, gin.H{"message": "Release reset. Timer will show until 11:30 AM 19 Feb or release early again."})
 }
 
 // GetSubmissionStatus returns PS submission window status (admin).

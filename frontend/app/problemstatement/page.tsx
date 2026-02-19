@@ -6,8 +6,8 @@ import RIFTBackground from '@/components/RIFTBackground'
 import { FileDown, RotateCcw } from 'lucide-react'
 import { getAdminToken } from '@/src/lib/admin-auth'
 
-// 19 Feb 2026 11:00 AM IST = 05:30 UTC
-const RELEASE_TIME = new Date(Date.UTC(2026, 1, 19, 5, 30, 0))
+// 19 Feb 2026 11:30 AM IST = 06:00 UTC
+const RELEASE_TIME = new Date(Date.UTC(2026, 1, 19, 6, 0, 0))
 
 interface PSItem {
   id: string
@@ -126,7 +126,7 @@ export default function ProblemStatementPage() {
           <h1 className="text-4xl md:text-8xl font-bold text-white text-center mb-2 font-[family-name:var(--font-tan)]">
             Problem Statements
           </h1>
-          <p className="text-zinc-400 text-2xl mb-12">Releasing 19 Feb 2026 at 11:00 AM</p>
+          <p className="text-zinc-400 text-2xl mb-12">Releasing 19 Feb 2026 at 11:30 AM</p>
 
           <div className="flex flex-wrap justify-center gap-4 md:gap-8 mb-12">
             <div className=" border border-white/10 rounded-2xl px-8 py-6 pt-10 text-center min-w-[100px]">

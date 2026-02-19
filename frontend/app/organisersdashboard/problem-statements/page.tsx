@@ -199,7 +199,7 @@ export default function ProblemStatementsPage() {
             <FileText className="text-red-500" size={32} />
             Problem Statements
           </h1>
-          <p className="text-zinc-400 mt-2">Add problem statements with Google Drive (or any) PDF links. They go live at 11 AM on 19 Feb 2026 (or after &quot;Release early&quot;).</p>
+          <p className="text-zinc-400 mt-2">Add problem statements with Google Drive (or any) PDF links. They go live at 11:30 AM on 19 Feb 2026 (or after &quot;Release early&quot;).</p>
         </div>
         <a
           href="/problemstatement"
