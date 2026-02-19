@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -211,7 +212,20 @@ func (h *SeatAllocatorHandler) CreateSeatsGrid(c *gin.Context) {
 	})
 }
 
+// positionSetKey returns a canonical key for a set of (row,col) positions for matching allocations.
+func positionSetKey(positions []struct{ Row, Col int }) string {
+	ps := make([]string, len(positions))
+	for i, p := range positions {
+		ps[i] = fmt.Sprintf("%d,%d", p.Row, p.Col)
+	}
+	sort.Strings(ps)
+	return strings.Join(ps, "|")
+}
+
 // CreateSeatsLayout creates seats from a visual layout and optionally saves full layout JSON (cells, walls, pillars, screens).
+// STRICT: No allocated team may ever be removed. We only allow the save if every currently allocated (row,col) set
+// still exists in the new layout (same positions, same grouping). Unallocated blocks may be changed/split/removed freely.
+// Allocations are remapped to the new seat IDs that occupy the same positions; we never delete seat_allocations.
 func (h *SeatAllocatorHandler) CreateSeatsLayout(c *gin.Context) {
 	var req struct {
 		RoomID uuid.UUID `json:"room_id" binding:"required"`
@@ -257,6 +271,77 @@ func (h *SeatAllocatorHandler) CreateSeatsLayout(c *gin.Context) {
 		return
 	}
 
+	// --- Capture existing allocations and their position sets (before deleting seats) ---
+	var allocations []models.SeatAllocation
+	if err := h.db.Preload("Seat").Where("room_id = ?", req.RoomID).Find(&allocations).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch existing allocations"})
+		return
+	}
+
+	type allocWithPositions struct {
+		Alloc     models.SeatAllocation
+		PosKey    string
+		Positions []struct{ Row, Col int }
+	}
+	var allocsWithPos []allocWithPositions
+	for _, a := range allocations {
+		var positions []struct{ Row, Col int }
+		if a.Seat != nil {
+			if a.Seat.SeatGroupID != nil {
+				var groupSeats []models.Seat
+				if err := h.db.Where("room_id = ? AND seat_group_id = ?", req.RoomID, *a.Seat.SeatGroupID).
+					Order("row_number ASC, column_number ASC").Find(&groupSeats).Error; err == nil {
+					for _, s := range groupSeats {
+						positions = append(positions, struct{ Row, Col int }{s.RowNumber, s.ColumnNumber})
+					}
+				}
+			}
+			if len(positions) == 0 {
+				positions = []struct{ Row, Col int }{{a.Seat.RowNumber, a.Seat.ColumnNumber}}
+			}
+		}
+		if len(positions) == 0 {
+			continue
+		}
+		allocsWithPos = append(allocsWithPos, allocWithPositions{Alloc: a, PosKey: positionSetKey(positions), Positions: positions})
+	}
+
+	// --- Build set of position keys that will exist in the new layout ---
+	seen := make(map[string]bool)
+	type pos struct{ RowNumber, ColumnNumber int }
+	var singleSeats []pos
+	for _, s := range req.Seats {
+		key := fmt.Sprintf("%d,%d", s.RowNumber, s.ColumnNumber)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		singleSeats = append(singleSeats, pos{s.RowNumber, s.ColumnNumber})
+	}
+	newLayoutPosKeys := make(map[string]bool)
+	for _, p := range singleSeats {
+		newLayoutPosKeys[positionSetKey([]struct{ Row, Col int }{{p.RowNumber, p.ColumnNumber}})] = true
+	}
+	for _, g := range req.Groups {
+		var posList []struct{ Row, Col int }
+		for _, p := range g.Positions {
+			posList = append(posList, struct{ Row, Col int }{p.RowNumber, p.ColumnNumber})
+			seen[fmt.Sprintf("%d,%d", p.RowNumber, p.ColumnNumber)] = true
+		}
+		newLayoutPosKeys[positionSetKey(posList)] = true
+	}
+
+	// --- STRICT: Reject if any allocated team's positions would be removed (no allocated team may ever be removed) ---
+	for _, ap := range allocsWithPos {
+		if !newLayoutPosKeys[ap.PosKey] {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Strict: no allocated team may be removed. This layout change would affect one or more allocated teams (their seat positions are no longer present as the same group in the new layout). Keep those positions unchanged, or only change unallocated blocks.",
+			})
+			return
+		}
+	}
+
+	// --- Delete existing seats (allocations stay in DB; we will remap seat_id) ---
 	if err := h.db.Unscoped().Where("room_id = ?", req.RoomID).Delete(&models.Seat{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear existing seats"})
 		return
@@ -270,33 +355,14 @@ func (h *SeatAllocatorHandler) CreateSeatsLayout(c *gin.Context) {
 		return "Row" + strconv.Itoa(row)
 	}
 
-	seen := make(map[string]bool)
-	type pos struct{ RowNumber, ColumnNumber int }
-	var singleSeats []pos
-	for _, s := range req.Seats {
-		key := fmt.Sprintf("%d,%d", s.RowNumber, s.ColumnNumber)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		singleSeats = append(singleSeats, pos{s.RowNumber, s.ColumnNumber})
-	}
-
-	// Mark positions used by groups so we don't double-create
-	for _, g := range req.Groups {
-		for _, p := range g.Positions {
-			seen[fmt.Sprintf("%d,%d", p.RowNumber, p.ColumnNumber)] = true
-		}
-	}
-
 	var seats []models.Seat
 
-	for _, pos := range singleSeats {
-		seatLabel := fmt.Sprintf("%s%d", labelFor(pos.RowNumber), pos.ColumnNumber)
+	for _, p := range singleSeats {
+		seatLabel := fmt.Sprintf("%s%d", labelFor(p.RowNumber), p.ColumnNumber)
 		seats = append(seats, models.Seat{
 			RoomID:       req.RoomID,
-			RowNumber:    pos.RowNumber,
-			ColumnNumber: pos.ColumnNumber,
+			RowNumber:    p.RowNumber,
+			ColumnNumber: p.ColumnNumber,
 			SeatLabel:    seatLabel,
 			IsAvailable:  true,
 			IsActive:     true,
@@ -331,22 +397,72 @@ func (h *SeatAllocatorHandler) CreateSeatsLayout(c *gin.Context) {
 		return
 	}
 
+	// --- Build map: positionSetKey -> new first seat ID (so we can remap allocations) ---
+	posKeyToNewSeatID := make(map[string]uuid.UUID)
+	// Single seats
+	for i, p := range singleSeats {
+		key := positionSetKey([]struct{ Row, Col int }{{p.RowNumber, p.ColumnNumber}})
+		posKeyToNewSeatID[key] = seats[i].ID
+	}
+	// Groups: first seat of each group (by creation order; we created in row/col order per group)
+	idx := len(singleSeats)
+	for _, g := range req.Groups {
+		var posList []struct{ Row, Col int }
+		for _, p := range g.Positions {
+			posList = append(posList, struct{ Row, Col int }{p.RowNumber, p.ColumnNumber})
+		}
+		key := positionSetKey(posList)
+		posKeyToNewSeatID[key] = seats[idx].ID
+		idx += len(g.Positions)
+	}
+
+	// --- Remap allocations to new seat IDs and mark those seats as occupied ---
+	for _, ap := range allocsWithPos {
+		newSeatID, ok := posKeyToNewSeatID[ap.PosKey]
+		if !ok {
+			continue
+		}
+		if err := h.db.Model(&models.SeatAllocation{}).Where("id = ?", ap.Alloc.ID).Update("seat_id", newSeatID).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remap allocation to new seat"})
+			return
+		}
+		if err := h.db.Model(&models.Seat{}).Where("id = ?", newSeatID).Update("is_available", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark seat as occupied"})
+			return
+		}
+	}
+	// Mark all seats in allocated groups as unavailable (by seat_group_id of each allocated first seat)
+	for _, ap := range allocsWithPos {
+		newSeatID := posKeyToNewSeatID[ap.PosKey]
+		var s models.Seat
+		if err := h.db.Where("id = ?", newSeatID).First(&s).Error; err != nil {
+			continue
+		}
+		if s.SeatGroupID != nil {
+			_ = h.db.Model(&models.Seat{}).Where("room_id = ? AND seat_group_id = ?", req.RoomID, *s.SeatGroupID).Update("is_available", false).Error
+		}
+	}
+
+	// --- Update room: capacity and layout_json; current_occupancy from allocations ---
 	updates := map[string]interface{}{
-		"capacity":          len(seats),
-		"current_occupancy": 0,
+		"capacity": len(seats),
 	}
 	if req.Layout != nil {
 		layoutBytes, _ := json.Marshal(req.Layout)
 		updates["layout_json"] = layoutBytes
 	}
+	var occupancy int
+	h.db.Model(&models.SeatAllocation{}).Where("room_id = ?", req.RoomID).Select("COALESCE(SUM(team_size), 0)").Scan(&occupancy)
+	updates["current_occupancy"] = occupancy
 	if err := h.db.Model(&room).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update room"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": fmt.Sprintf("Created %d seats for room %s", len(seats), room.Name),
-		"count":   len(seats),
+		"message":    fmt.Sprintf("Created %d seats for room %s. Existing team allocations were preserved.", len(seats), room.Name),
+		"count":      len(seats),
+		"remapped":   len(allocsWithPos),
 	})
 }
 
