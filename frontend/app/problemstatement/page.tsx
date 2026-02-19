@@ -211,7 +211,7 @@ export default function ProblemStatementPage() {
 
             {error && <p className="mt-4 text-red-400 text-sm text-center">{error}</p>}
           </div>
-        </div>
+        </div>  
       )}
     </div>
   )

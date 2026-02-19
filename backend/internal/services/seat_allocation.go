@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -201,17 +202,23 @@ func (s *SeatAllocationService) findBestAvailableSeats(tx *gorm.DB, teamSize int
 	return []*models.Seat{&seat}, nil
 }
 
-// getTeamSize returns the team's original size (member_count) for seat allocation.
-// Allocation is based on registered team size, not how many participants checked in.
+// getTeamSize returns the team's RSVP2 size (number of members selected at final confirmation) for seat allocation.
+// Allocation is based on RSVP2 team size, not checked-in count. Uses rsvp2_selected_members length; fallback to member_count then team_members count.
 func (s *SeatAllocationService) getTeamSize(tx *gorm.DB, teamID uuid.UUID) (int, error) {
 	var team models.Team
-	err := tx.Select("member_count").First(&team, teamID).Error
+	err := tx.Select("member_count", "rsvp2_selected_members").First(&team, teamID).Error
 	if err != nil {
 		return 0, err
 	}
+	// Prefer RSVP2 selected members count (team size at final confirmation)
+	if len(team.RSVP2SelectedMembers) > 0 {
+		var ids []uuid.UUID
+		if json.Unmarshal(team.RSVP2SelectedMembers, &ids) == nil && len(ids) > 0 {
+			return len(ids), nil
+		}
+	}
 	size := team.MemberCount
 	if size <= 0 {
-		// Fallback: count team_members if member_count not set
 		var count int64
 		if err := tx.Table("team_members").Where("team_id = ?", teamID).Count(&count).Error; err != nil {
 			return 0, err
