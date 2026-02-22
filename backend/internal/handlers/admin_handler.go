@@ -21,6 +21,7 @@ type AdminHandler struct {
 	userRepo                      *repository.UserRepository
 	jwtSecret                     string
 	registrationDeskAllocService  *services.RegistrationDeskAllocationService
+	participantCheckinRepo        *repository.ParticipantCheckInRepository
 }
 
 func NewAdminHandler(
@@ -30,6 +31,7 @@ func NewAdminHandler(
 	userRepo *repository.UserRepository,
 	jwtSecret string,
 	registrationDeskAllocService *services.RegistrationDeskAllocationService,
+	participantCheckinRepo *repository.ParticipantCheckInRepository,
 ) *AdminHandler {
 	return &AdminHandler{
 		teamRepo:                     teamRepo,
@@ -38,6 +40,7 @@ func NewAdminHandler(
 		userRepo:                     userRepo,
 		jwtSecret:                    jwtSecret,
 		registrationDeskAllocService: registrationDeskAllocService,
+		participantCheckinRepo:       participantCheckinRepo,
 	}
 }
 
@@ -488,6 +491,23 @@ func (h *AdminHandler) GetCheckInStats(c *gin.Context) {
 	}
 
 	c.JSON(200, stats)
+}
+
+// UndoCheckIn removes a team's check-in (all participant check-ins and team checked_in_at). Admin only.
+// Register: DELETE /api/v1/admin/checkin/:team_id
+func (h *AdminHandler) UndoCheckIn(c *gin.Context) {
+	teamIDStr := c.Param("team_id")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid team ID"})
+		return
+	}
+	if err := h.participantCheckinRepo.DeleteByTeamIDForAdmin(teamID); err != nil {
+		log.Printf("UndoCheckIn: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to undo check-in"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Check-in undone successfully"})
 }
 
 // GetAllTeams returns all teams with filters

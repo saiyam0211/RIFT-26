@@ -227,6 +227,29 @@ func (r *ParticipantCheckInRepository) DeleteByTeamID(teamID uuid.UUID, voluntee
 	return nil
 }
 
+// DeleteByTeamIDForAdmin removes all participant check-ins for a team and clears team check-in (admin only).
+// Use this for organiser undo check-in; no volunteer_id filter.
+func (r *ParticipantCheckInRepository) DeleteByTeamIDForAdmin(teamID uuid.UUID) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`DELETE FROM participant_check_ins WHERE team_id = $1`, teamID)
+	if err != nil {
+		return fmt.Errorf("failed to delete participant check-ins: %w", err)
+	}
+	_, err = tx.Exec(`UPDATE teams SET checked_in_at = NULL, volunteer_table_id = NULL WHERE id = $1`, teamID)
+	if err != nil {
+		return fmt.Errorf("failed to reset team check-in: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
 // CreateTableConfirmation marks a team as confirmed by table volunteer
 func (r *ParticipantCheckInRepository) CreateTableConfirmation(confirmation *models.TableConfirmation) error {
 	confirmation.ID = uuid.New()

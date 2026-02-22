@@ -95,7 +95,7 @@ func main() {
 	seatAllocatorHandler := handlers.NewSeatAllocatorHandler(gormDB)
 	volunteerAuthHandler := handlers.NewVolunteerAuthHandler(volunteerService)
 	volunteerAdminHandler := handlers.NewVolunteerAdminHandler(volunteerAdminService, volunteerRepo, participantCheckinRepo, seatAllocationService, eventTableService, teamRepo, gormDB)
-	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret, registrationDeskAllocService)
+	adminHandler := handlers.NewAdminHandler(teamRepo, announcementRepo, teamService, userRepo, cfg.JWTSecret, registrationDeskAllocService, participantCheckinRepo)
 	rsvpPinHandler := handlers.NewRSVPPinHandler(cfg.RSVPPinSecret, cfg.RSVPOpen)
 	ticketHandler := handlers.NewTicketHandler(ticketService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementService)
@@ -287,6 +287,7 @@ func main() {
 
 			// Stats
 			adminRoutes.GET("/stats/checkin", adminHandler.GetCheckInStats)
+			adminRoutes.DELETE("/checkin/:team_id", adminHandler.UndoCheckIn)
 
 			// RSVP PIN (when RSVP_OPEN=pin)
 			adminRoutes.GET("/rsvp-pin", rsvpPinHandler.GetRSVPPin)

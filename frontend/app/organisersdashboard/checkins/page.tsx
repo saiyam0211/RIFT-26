@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
 import { Team } from '../../../src/types/admin';
+import { Eye, X, LogOut } from 'lucide-react';
 
 export default function CheckInsPage() {
     const [teams, setTeams] = useState<Team[]>([]);
@@ -10,6 +11,8 @@ export default function CheckInsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterCity, setFilterCity] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [viewTeam, setViewTeam] = useState<Team | null>(null);
+    const [undoingId, setUndoingId] = useState<string | null>(null);
     const teamsPerPage = 7;
 
     useEffect(() => {
@@ -92,6 +95,27 @@ export default function CheckInsPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const handleUndoCheckIn = async (teamId: string) => {
+        if (!confirm('Remove check-in for this team? They will need to check in again.')) return;
+        setUndoingId(teamId);
+        try {
+            const token = getAdminToken();
+            const res = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/admin/checkin/${teamId}`,
+                { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                alert(data.error || 'Failed to undo check-in');
+                return;
+            }
+            setViewTeam(null);
+            await fetchCheckIns();
+        } finally {
+            setUndoingId(null);
+        }
     };
 
     return (
@@ -197,6 +221,7 @@ export default function CheckInsPage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Leader</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">City</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">Members</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-800">
@@ -228,6 +253,15 @@ export default function CheckInsPage() {
                                             <span className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-sm font-semibold">
                                                 {team.members?.length || 0}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={() => setViewTeam(team)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 text-sm font-medium transition"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                                View
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -289,6 +323,64 @@ export default function CheckInsPage() {
                             </div>
                             <div className="text-sm text-zinc-400">
                                 Page <span className="font-semibold text-white">{currentPage}</span> of <span className="font-semibold text-white">{totalPages}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* View team modal */}
+                    {viewTeam && (
+                        <div
+                            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                            onClick={(e) => e.target === e.currentTarget && setViewTeam(null)}
+                        >
+                            <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-xl">
+                                <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+                                    <h3 className="text-xl font-semibold text-white">{viewTeam.team_name}</h3>
+                                    <button
+                                        onClick={() => setViewTeam(null)}
+                                        className="text-zinc-400 hover:text-white transition p-1"
+                                    >
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto space-y-4">
+                                    {viewTeam.city && (
+                                        <div>
+                                            <span className="text-zinc-400 text-sm">City</span>
+                                            <p className="text-white font-medium">{viewTeam.city}</p>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <span className="text-zinc-400 text-sm block mb-2">Members ({viewTeam.members?.length || 0})</span>
+                                        <ul className="space-y-2">
+                                            {viewTeam.members?.map((m) => (
+                                                <li key={m.id} className="bg-zinc-800/50 rounded-lg px-4 py-3 flex justify-between items-center">
+                                                    <div>
+                                                        <span className="text-white font-medium">{m.name}</span>
+                                                        <span className="ml-2 text-zinc-400 text-sm">{m.role === 'leader' ? '(Leader)' : ''}</span>
+                                                    </div>
+                                                    <div className="text-zinc-400 text-sm truncate max-w-[200px]" title={m.email}>{m.email}</div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="p-6 border-t border-zinc-800 flex gap-3 justify-end">
+                                    <button
+                                        onClick={() => setViewTeam(null)}
+                                        className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        onClick={() => handleUndoCheckIn(viewTeam.id)}
+                                        disabled={undoingId === viewTeam.id}
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-medium transition"
+                                    >
+                                        <LogOut className="w-4 h-4" />
+                                        {undoingId === viewTeam.id ? 'Removing...' : 'Uncheck-in team'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
