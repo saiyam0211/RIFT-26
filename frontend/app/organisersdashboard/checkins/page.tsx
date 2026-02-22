@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
 import { Team } from '../../../src/types/admin';
-import { Eye, X, LogOut } from 'lucide-react';
+import { Eye, X, LogOut, UserMinus } from 'lucide-react';
 
 export default function CheckInsPage() {
     const [teams, setTeams] = useState<Team[]>([]);
@@ -13,13 +13,14 @@ export default function CheckInsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [viewTeam, setViewTeam] = useState<Team | null>(null);
     const [undoingId, setUndoingId] = useState<string | null>(null);
+    const [undoingMemberId, setUndoingMemberId] = useState<string | null>(null);
     const teamsPerPage = 7;
 
     useEffect(() => {
         fetchCheckIns();
     }, []);
 
-    const fetchCheckIns = async () => {
+    const fetchCheckIns = async (): Promise<Team[]> => {
         try {
             const token = getAdminToken();
             const response = await fetch(
@@ -27,9 +28,12 @@ export default function CheckInsPage() {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const data = await response.json();
-            setTeams(data.teams || []);
+            const list = data.teams || [];
+            setTeams(list);
+            return list;
         } catch (error) {
             console.error('Failed to fetch check-ins:', error);
+            return [];
         } finally {
             setLoading(false);
         }
@@ -115,6 +119,32 @@ export default function CheckInsPage() {
             await fetchCheckIns();
         } finally {
             setUndoingId(null);
+        }
+    };
+
+    const handleUndoCheckInMember = async (teamId: string, memberId: string) => {
+        if (!confirm('Remove check-in for this member only? They will need to be checked in again.')) return;
+        setUndoingMemberId(memberId);
+        try {
+            const token = getAdminToken();
+            const res = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/admin/checkin/${teamId}/member/${memberId}`,
+                { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                alert(data.error || 'Failed to remove member check-in');
+                return;
+            }
+            const newTeams = await fetchCheckIns();
+            const stillCheckedIn = newTeams.find(t => t.id === teamId);
+            if (stillCheckedIn) {
+                setViewTeam(stillCheckedIn);
+            } else {
+                setViewTeam(null);
+            }
+        } finally {
+            setUndoingMemberId(null);
         }
     };
 
@@ -354,12 +384,21 @@ export default function CheckInsPage() {
                                         <span className="text-zinc-400 text-sm block mb-2">Members ({viewTeam.members?.length || 0})</span>
                                         <ul className="space-y-2">
                                             {viewTeam.members?.map((m) => (
-                                                <li key={m.id} className="bg-zinc-800/50 rounded-lg px-4 py-3 flex justify-between items-center">
-                                                    <div>
+                                                <li key={m.id} className="bg-zinc-800/50 rounded-lg px-4 py-3 flex justify-between items-center gap-3">
+                                                    <div className="min-w-0 flex-1">
                                                         <span className="text-white font-medium">{m.name}</span>
                                                         <span className="ml-2 text-zinc-400 text-sm">{m.role === 'leader' ? '(Leader)' : ''}</span>
+                                                        <div className="text-zinc-400 text-sm truncate mt-0.5" title={m.email}>{m.email}</div>
                                                     </div>
-                                                    <div className="text-zinc-400 text-sm truncate max-w-[200px]" title={m.email}>{m.email}</div>
+                                                    <button
+                                                        onClick={() => handleUndoCheckInMember(viewTeam.id, m.id)}
+                                                        disabled={undoingMemberId === m.id}
+                                                        className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 text-sm font-medium transition disabled:opacity-60"
+                                                        title="Remove this member's check-in"
+                                                    >
+                                                        <UserMinus className="w-4 h-4" />
+                                                        {undoingMemberId === m.id ? 'Removing...' : 'Uncheck-in'}
+                                                    </button>
                                                 </li>
                                             ))}
                                         </ul>

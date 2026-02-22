@@ -288,6 +288,7 @@ func main() {
 			// Stats
 			adminRoutes.GET("/stats/checkin", adminHandler.GetCheckInStats)
 			adminRoutes.DELETE("/checkin/:team_id", adminHandler.UndoCheckIn)
+			adminRoutes.DELETE("/checkin/:team_id/member/:member_id", adminHandler.UndoCheckInMember)
 
 			// RSVP PIN (when RSVP_OPEN=pin)
 			adminRoutes.GET("/rsvp-pin", rsvpPinHandler.GetRSVPPin)

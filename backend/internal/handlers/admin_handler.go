@@ -510,6 +510,27 @@ func (h *AdminHandler) UndoCheckIn(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Check-in undone successfully"})
 }
 
+// UndoCheckInMember removes one member's check-in for a team (admin only). If no members remain checked in, clears team check-in.
+// Register: DELETE /api/v1/admin/checkin/:team_id/member/:member_id
+func (h *AdminHandler) UndoCheckInMember(c *gin.Context) {
+	teamID, err := uuid.Parse(c.Param("team_id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid team ID"})
+		return
+	}
+	memberID, err := uuid.Parse(c.Param("member_id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid member ID"})
+		return
+	}
+	if err := h.participantCheckinRepo.DeleteByTeamAndMemberForAdmin(teamID, memberID); err != nil {
+		log.Printf("UndoCheckInMember: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to remove member check-in"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Member check-in removed"})
+}
+
 // GetAllTeams returns all teams with filters
 // GET /api/v1/admin/teams?status=&city=
 func (h *AdminHandler) GetAllTeams(c *gin.Context) {
