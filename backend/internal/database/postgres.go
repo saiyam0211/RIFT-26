@@ -42,6 +42,19 @@ CREATE INDEX IF NOT EXISTS idx_ps_selections_locked ON ps_selections(locked_at);
 	}
 }
 
+// ensurePSSemiFinalistFlag adds is_semi_finalist and award fields to ps_selections (idempotent).
+func ensurePSSemiFinalistFlag(db *sql.DB) {
+	if _, err := db.Exec(`ALTER TABLE ps_selections ADD COLUMN IF NOT EXISTS is_semi_finalist BOOLEAN NOT NULL DEFAULT FALSE`); err != nil {
+		log.Printf("[migration] ps_selections.is_semi_finalist: %v", err)
+	}
+	if _, err := db.Exec(`ALTER TABLE ps_selections ADD COLUMN IF NOT EXISTS position INTEGER`); err != nil {
+		log.Printf("[migration] ps_selections.position: %v", err)
+	}
+	if _, err := db.Exec(`ALTER TABLE ps_selections ADD COLUMN IF NOT EXISTS best_web3 BOOLEAN NOT NULL DEFAULT FALSE`); err != nil {
+		log.Printf("[migration] ps_selections.best_web3: %v", err)
+	}
+}
+
 func NewPostgresDB(databaseURL string) (*DB, error) {
 	db, err := sql.Open("postgres", databaseURL)
 	if err != nil {
@@ -56,6 +69,8 @@ func NewPostgresDB(databaseURL string) (*DB, error) {
 	ensureProblemStatementSubmissionFields(db)
 	// Ensure ps_selections table exists for PS locking
 	ensurePSSelectionsTable(db)
+	// Ensure ps_selections has semi-finalist flag
+	ensurePSSemiFinalistFlag(db)
 
 	// Set connection pool settings
 	db.SetMaxOpenConns(25)

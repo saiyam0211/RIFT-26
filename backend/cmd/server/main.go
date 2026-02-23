@@ -290,6 +290,12 @@ func main() {
 			adminRoutes.DELETE("/checkin/:team_id", adminHandler.UndoCheckIn)
 			adminRoutes.DELETE("/checkin/:team_id/member/:member_id", adminHandler.UndoCheckInMember)
 
+			// Semi-finalists (PS selections)
+			adminRoutes.GET("/semi-finalists", checkPSHandler.GetSemiFinalists)
+			adminRoutes.POST("/semi-finalists/:team_id", checkPSHandler.MarkSemiFinalist)
+			adminRoutes.DELETE("/semi-finalists/:team_id", checkPSHandler.UnmarkSemiFinalist)
+			adminRoutes.POST("/semi-finalists/:team_id/awards", checkPSHandler.SetAwards)
+
 			// RSVP PIN (when RSVP_OPEN=pin)
 			adminRoutes.GET("/rsvp-pin", rsvpPinHandler.GetRSVPPin)
 

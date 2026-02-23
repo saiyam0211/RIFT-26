@@ -49,6 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Bulk Upload', path: '/organisersdashboard/bulk-upload', icon: Upload },
         { name: 'Teams', path: '/organisersdashboard/teams', icon: Users },
         { name: 'Check-ins', path: '/organisersdashboard/checkins', icon: CheckCircle },
+        { name: 'Semi Finalists', path: '/organisersdashboard/semi-finalists', icon: CheckCircle },
         { name: 'Volunteers', path: '/organisersdashboard/volunteers', icon: Users },
         { name: 'Tables', path: '/organisersdashboard/tables', icon: Table },
         { name: 'Problem Statements', path: '/organisersdashboard/problem-statements', icon: FileText },

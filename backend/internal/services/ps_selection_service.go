@@ -75,3 +75,33 @@ func (s *PSSelectionService) GetByTeamID(ctx context.Context, teamID uuid.UUID) 
 func (s *PSSelectionService) GetAllWithDetails(ctx context.Context, city *string) ([]models.PSSelectionWithDetails, error) {
 	return s.repo.GetAllWithDetails(ctx, city)
 }
+
+// GetSemiFinalistsWithDetails returns only semi-finalist selections.
+func (s *PSSelectionService) GetSemiFinalistsWithDetails(ctx context.Context, city *string) ([]models.PSSelectionWithDetails, error) {
+	return s.repo.GetSemiFinalistsWithDetails(ctx, city)
+}
+
+// SetSemiFinalist marks or unmarks a team's selection as semi-finalist.
+func (s *PSSelectionService) SetSemiFinalist(ctx context.Context, teamID uuid.UUID, semi bool) error {
+	// Ensure selection exists
+	_, err := s.repo.GetByTeamID(ctx, teamID)
+	if err != nil {
+		return fmt.Errorf("team has not locked a problem statement yet")
+	}
+	return s.repo.SetSemiFinalist(ctx, teamID, semi)
+}
+
+// SetAwards assigns position (1–5 or nil) and best_web3 flag for certificates.
+func (s *PSSelectionService) SetAwards(ctx context.Context, teamID uuid.UUID, position *int, bestWeb3 bool) error {
+	if position != nil {
+		if *position < 1 || *position > 5 {
+			return fmt.Errorf("position must be between 1 and 5")
+		}
+	}
+	// Ensure selection exists
+	_, err := s.repo.GetByTeamID(ctx, teamID)
+	if err != nil {
+		return fmt.Errorf("team has not locked a problem statement yet")
+	}
+	return s.repo.SetAwards(ctx, teamID, position, bestWeb3)
+}

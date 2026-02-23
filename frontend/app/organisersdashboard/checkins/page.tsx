@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
 import { Team } from '../../../src/types/admin';
-import { Eye, X, LogOut, UserMinus } from 'lucide-react';
+import { Eye, X, LogOut, UserMinus, Star } from 'lucide-react';
 
 export default function CheckInsPage() {
     const [teams, setTeams] = useState<Team[]>([]);
@@ -405,11 +405,31 @@ export default function CheckInsPage() {
                                     </div>
                                 </div>
                                 <div className="p-6 border-t border-zinc-800 flex gap-3 justify-end">
-                                    <button
+                                    {/* <button
                                         onClick={() => setViewTeam(null)}
                                         className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition"
                                     >
                                         Close
+                                    </button> */}
+                                    <button
+                                        onClick={async () => {
+                                            if (!viewTeam) return;
+                                            const token = getAdminToken();
+                                            const res = await fetch(
+                                                `${process.env.NEXT_PUBLIC_API_URL}/admin/semi-finalists/${viewTeam.id}`,
+                                                { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+                                            );
+                                            const data = await res.json().catch(() => ({}));
+                                            if (!res.ok) {
+                                                alert(data.error || 'Failed to mark as semi-finalist');
+                                                return;
+                                            }
+                                            alert('Team marked as semi-finalist');
+                                        }}
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition"
+                                    >
+                                        {/* <Star className="w-4 h-4" /> */}
+                                        Mark as semi-finalist
                                     </button>
                                     <button
                                         onClick={() => handleUndoCheckIn(viewTeam.id)}

@@ -15,6 +15,9 @@ type PSSelection struct {
 	LockedAt          time.Time `json:"locked_at" db:"locked_at"`
 	CreatedAt         time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+	IsSemiFinalist    bool      `json:"is_semi_finalist" db:"is_semi_finalist"`
+	Position          *int      `json:"position,omitempty" db:"position"`
+	BestWeb3          bool      `json:"best_web3" db:"best_web3"`
 }
 
 // PSSelectionWithDetails includes PS name/track for display
@@ -24,4 +27,6 @@ type PSSelectionWithDetails struct {
 	TeamCity          *City  `json:"team_city"`
 	PSTrack           string `json:"ps_track"`
 	PSName            string `json:"ps_name"`
+	LeaderName        string `json:"leader_name"`
+	LeaderEmail       string `json:"leader_email"`
 }
