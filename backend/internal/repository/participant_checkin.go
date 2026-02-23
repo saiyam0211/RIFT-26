@@ -251,7 +251,8 @@ func (r *ParticipantCheckInRepository) DeleteByTeamIDForAdmin(teamID uuid.UUID) 
 }
 
 // DeleteByTeamAndMemberForAdmin removes one member's check-in for a team (admin only).
-// If no participant check-ins remain for the team, clears team checked_in_at.
+// IMPORTANT: This does NOT clear the team's checked_in status – the team stays checked_in
+// so it continues to appear in admin check-ins. Use DeleteByTeamIDForAdmin to fully undo.
 func (r *ParticipantCheckInRepository) DeleteByTeamAndMemberForAdmin(teamID, teamMemberID uuid.UUID) error {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -269,17 +270,6 @@ func (r *ParticipantCheckInRepository) DeleteByTeamAndMemberForAdmin(teamID, tea
 		var name, role string
 		if err := tx.QueryRow(`SELECT name, role FROM team_members WHERE id = $1 AND team_id = $2`, teamMemberID, teamID).Scan(&name, &role); err == nil {
 			_, _ = tx.Exec(`DELETE FROM participant_check_ins WHERE team_id = $1 AND participant_name = $2 AND participant_role = $3`, teamID, name, role)
-		}
-	}
-
-	var remaining int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM participant_check_ins WHERE team_id = $1`, teamID).Scan(&remaining); err != nil {
-		return fmt.Errorf("failed to count remaining check-ins: %w", err)
-	}
-	if remaining == 0 {
-		_, err = tx.Exec(`UPDATE teams SET checked_in_at = NULL, volunteer_table_id = NULL, status = 'rsvp2_done', updated_at = NOW() WHERE id = $1`, teamID)
-		if err != nil {
-			return fmt.Errorf("failed to clear team check-in: %w", err)
 		}
 	}
 
