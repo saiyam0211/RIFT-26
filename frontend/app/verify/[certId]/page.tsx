@@ -171,23 +171,19 @@ export default function VerifyPage({ params }: { params: Promise<{ certId: strin
     };
 
     return (
-        <div className="min-h-screen bg-zinc-950 py-10 px-4">
+        <div className="min-h-screen bg-zinc-950 py-6 px-3 sm:py-10 sm:px-4">
 
             {/* ── Header ── */}
-            <header className="max-w-4xl mx-auto mb-8 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    {/* <span className="bg-red-600 text-white font-black text-lg px-3 py-1 rounded tracking-wider">RIFT</span>
-                    <span className="text-zinc-500 text-sm">'26 Hackathon</span> */}
-                </div>
+            <header className="max-w-4xl mx-auto mb-6 flex items-center justify-end">
                 <span className="inline-flex items-center gap-1.5 bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-semibold px-3 py-1.5 rounded-full">
                     <Shield className="w-3.5 h-3.5" />
                     Verified
                 </span>
             </header>
 
-            <main className="max-w-4xl mx-auto space-y-6">
+            <main className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
 
-                {/* ── Certificate image (SVG — full detail for view) ── */}
+                {/* ── Certificate image ── */}
                 <div className="rounded-2xl overflow-hidden shadow-2xl border border-zinc-800 bg-zinc-900">
                     <img
                         ref={svgRef}
@@ -200,26 +196,27 @@ export default function VerifyPage({ params }: { params: Promise<{ certId: strin
                 </div>
 
                 {/* ── Main info + actions ── */}
-                <div className="flex flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
 
                     {/* Verification card */}
-                    <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+                    <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-4">
                         <div className="flex items-center gap-3">
                             <CheckCircle className="w-6 h-6 text-green-400 shrink-0" />
-                            <h2 className="text-white font-bold text-3xl">Certificate Verified</h2>
+                            <h2 className="text-white font-bold text-2xl sm:text-3xl">Certificate Verified</h2>
                         </div>
-                        <div className="space-y-3 text-lg mt-8">
+                        <div className="space-y-3 text-base sm:text-lg mt-2">
                             <Row icon={<Award className="w-4 h-4 text-zinc-500" />} label="Recipient" value={cert.participant_name} />
-                            <Row icon={<Users className="w-4 h-4 text-zinc-500" />} label="Team" value={cert.team_name} />
+                            {cert.team_name && (
+                                <Row icon={<Users className="w-4 h-4 text-zinc-500" />} label="Team" value={cert.team_name} />
+                            )}
                             <Row icon={<Calendar className="w-4 h-4 text-zinc-500" />} label="Issued" value={data.issued_at || '—'} />
                         </div>
                     </div>
 
                     {/* Actions card */}
-                    <div className="w-full sm:w-72 flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col gap-3">
+                    <div className="w-full sm:w-64 bg-zinc-900 border border-zinc-800 rounded-2xl p-5 sm:p-6 flex flex-col gap-3">
                         <p className="text-zinc-400 text-sm font-medium">Add to LinkedIn or share</p>
 
-                        {/* ── Add to Certifications section ── */}
                         <a
                             href={linkedInAddUrl}
                             target="_blank"
@@ -230,18 +227,6 @@ export default function VerifyPage({ params }: { params: Promise<{ certId: strin
                             Add to Certifications
                         </a>
 
-                        {/* ── Share as LinkedIn post (image appears as rich card) ── */}
-                        {/* <a
-                            href={linkedInShareUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2.5 w-full bg-[#0a66c2]/20 hover:bg-[#0a66c2]/30 border border-[#0a66c2]/40 active:scale-95 transition-all text-[#70aae8] font-semibold text-sm py-3 px-4 rounded-xl"
-                        >
-                            <Share2 className="w-4 h-4" />
-                            Share on LinkedIn
-                        </a> */}
-
-                        {/* ── Download certificate (instant client-side JPEG) ── */}
                         <button
                             onClick={handleDownload}
                             disabled={downloading}
@@ -252,7 +237,6 @@ export default function VerifyPage({ params }: { params: Promise<{ certId: strin
                                 : <><Download className="w-4 h-4" /> Download as JPEG</>}
                         </button>
 
-                        {/* ── Copy verify link ── */}
                         <button
                             onClick={copyLink}
                             className="flex items-center justify-center gap-2.5 w-full border border-zinc-700 hover:border-zinc-500 active:scale-95 transition-all text-zinc-400 hover:text-zinc-200 font-medium text-sm py-3 px-4 rounded-xl"
@@ -261,18 +245,17 @@ export default function VerifyPage({ params }: { params: Promise<{ certId: strin
                             {copied ? 'Copied!' : 'Copy Certificate Link'}
                         </button>
 
-                        <div className="pt-1 space-y-1.5 text-xs text-zinc-600">
-                            <p>• <strong className="text-zinc-500">Add to Certifications</strong> — shows in the Certifications section of your LinkedIn profile.</p>
-                            {/* <p>• <strong className="text-zinc-500">Share on LinkedIn</strong> — creates a post with the certificate image attached. You can then save it to your <em>Featured</em> section.</p> */}
-                        </div>
+                        <p className="pt-1 text-xs text-zinc-600">
+                            • <strong className="text-zinc-500">Add to Certifications</strong> — shows in the Certifications section of your LinkedIn profile.
+                        </p>
                     </div>
                 </div>
 
                 {/* ── Certificate ID ── */}
-                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="flex-1 min-w-0">
                         <p className="text-zinc-500 text-xs uppercase tracking-widest mb-1">Certificate ID</p>
-                        <p className="text-zinc-300 font-mono text-sm break-all">{cert.id}</p>
+                        <p className="text-zinc-300 font-mono text-xs sm:text-sm break-all">{cert.id}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <span className="text-green-400 text-xs font-semibold bg-green-400/10 border border-green-400/20 px-3 py-1.5 rounded-full">
@@ -296,6 +279,7 @@ export default function VerifyPage({ params }: { params: Promise<{ certId: strin
             </main>
         </div>
     );
+
 }
 
 // ── Small helper component ─────────────────────────────────────────────────
