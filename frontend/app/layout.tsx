@@ -172,7 +172,7 @@ export default function RootLayout({
                 {/* Favicon */}
                 <link rel="icon" href="/RIFT.png" type="image/png" />
                 <link rel="shortcut icon" href="/RIFT.png" />
-                
+
                 {/* PWA Meta Tags */}
                 <link rel="manifest" href="/manifest.json" />
                 <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -184,7 +184,7 @@ export default function RootLayout({
                 <meta name="format-detection" content="telephone=no" />
                 <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="theme-color" content="#c0211f" />
-                
+
                 {/* Social Media Links */}
                 <link rel="me" href="https://www.instagram.com/rift.pwioi" />
 

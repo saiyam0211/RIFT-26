@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
 import { Team } from '../../../src/types/admin';
-import { Eye, X, LogOut, UserMinus, Star } from 'lucide-react';
+import { Eye, X, LogOut, UserMinus, Award, CheckSquare, Square, MinusSquare } from 'lucide-react';
+import { CertificateSendModal } from '../../../components/CertificateSendModal';
 
 export default function CheckInsPage() {
     const [teams, setTeams] = useState<Team[]>([]);
@@ -14,6 +15,11 @@ export default function CheckInsPage() {
     const [viewTeam, setViewTeam] = useState<Team | null>(null);
     const [undoingId, setUndoingId] = useState<string | null>(null);
     const [undoingMemberId, setUndoingMemberId] = useState<string | null>(null);
+
+    // Multi-select state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [certModalOpen, setCertModalOpen] = useState(false);
+
     const teamsPerPage = 7;
 
     useEffect(() => {
@@ -63,6 +69,43 @@ export default function CheckInsPage() {
         setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
+
+    // ---- Selection helpers ----
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const isPageAllSelected = paginatedTeams.length > 0 && paginatedTeams.every(t => selectedIds.has(t.id));
+    const isPagePartialSelected = paginatedTeams.some(t => selectedIds.has(t.id)) && !isPageAllSelected;
+
+    const togglePageSelect = () => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (isPageAllSelected) {
+                paginatedTeams.forEach(t => next.delete(t.id));
+            } else {
+                paginatedTeams.forEach(t => next.add(t.id));
+            }
+            return next;
+        });
+    };
+
+    const selectAll = () => {
+        setSelectedIds(new Set(filteredTeams.map(t => t.id)));
+    };
+
+    const clearSelection = () => setSelectedIds(new Set());
+
+    // Estimated participant count for selected teams
+    const estimatedParticipants = Array.from(selectedIds).reduce((sum, id) => {
+        const team = teams.find(t => t.id === id);
+        return sum + (team?.members?.length || 4);
+    }, 0);
 
     const downloadCSV = () => {
         const dataToExport = filteredTeams;
@@ -116,6 +159,7 @@ export default function CheckInsPage() {
                 return;
             }
             setViewTeam(null);
+            setSelectedIds(prev => { const n = new Set(prev); n.delete(teamId); return n; });
             await fetchCheckIns();
         } finally {
             setUndoingId(null);
@@ -243,10 +287,46 @@ export default function CheckInsPage() {
                 </div>
             ) : (
                 <>
+                    {/* Select-all banner (cross-page) */}
+                    {selectedIds.size > 0 && selectedIds.size < filteredTeams.length && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 mb-3 flex items-center justify-between text-sm">
+                            <span className="text-amber-300">
+                                {selectedIds.size} team{selectedIds.size !== 1 ? 's' : ''} selected on this page.
+                            </span>
+                            <button
+                                onClick={selectAll}
+                                className="text-amber-400 font-semibold hover:text-amber-300 underline"
+                            >
+                                Select all {filteredTeams.length} teams
+                            </button>
+                        </div>
+                    )}
+                    {selectedIds.size === filteredTeams.length && filteredTeams.length > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 mb-3 flex items-center justify-between text-sm">
+                            <span className="text-amber-300">All {filteredTeams.length} teams selected.</span>
+                            <button onClick={clearSelection} className="text-amber-400 font-semibold hover:text-amber-300 underline">Clear selection</button>
+                        </div>
+                    )}
+
                     <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
                         <table className="min-w-full divide-y divide-zinc-800">
                             <thead className="bg-red-600 text-white">
                                 <tr>
+                                    <th className="px-4 py-3 w-10">
+                                        <button
+                                            onClick={togglePageSelect}
+                                            className="flex items-center justify-center text-white hover:text-amber-200 transition"
+                                            title={isPageAllSelected ? 'Deselect page' : 'Select page'}
+                                        >
+                                            {isPageAllSelected ? (
+                                                <CheckSquare className="w-5 h-5" />
+                                            ) : isPagePartialSelected ? (
+                                                <MinusSquare className="w-5 h-5 opacity-70" />
+                                            ) : (
+                                                <Square className="w-5 h-5 opacity-60" />
+                                            )}
+                                        </button>
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Team Name</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Leader</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">City</th>
@@ -255,46 +335,60 @@ export default function CheckInsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-800">
-                                {paginatedTeams.map((team, idx) => (
-                                    <tr key={team.id} className={`hover:bg-zinc-800 transition-colors ${idx % 2 === 0 ? 'bg-zinc-950' : 'bg-black'}`}>
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium text-white">{team.team_name}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {team.members?.find(m => m.role === 'leader') && (
-                                                <div>
-                                                    <div className="text-sm font-medium text-white">
-                                                        {team.members.find(m => m.role === 'leader')?.name}
+                                {paginatedTeams.map((team, idx) => {
+                                    const isSelected = selectedIds.has(team.id);
+                                    return (
+                                        <tr
+                                            key={team.id}
+                                            className={`hover:bg-zinc-800 transition-colors ${isSelected ? 'bg-amber-500/5 border-l-2 border-amber-500' : idx % 2 === 0 ? 'bg-zinc-950' : 'bg-black'}`}
+                                        >
+                                            <td className="px-4 py-4">
+                                                <button
+                                                    onClick={() => toggleSelect(team.id)}
+                                                    className={`flex items-center justify-center transition ${isSelected ? 'text-amber-400' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                                >
+                                                    {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                                                </button>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-medium text-white">{team.team_name}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {team.members?.find(m => m.role === 'leader') && (
+                                                    <div>
+                                                        <div className="text-sm font-medium text-white">
+                                                            {team.members.find(m => m.role === 'leader')?.name}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-400">
+                                                            {team.members.find(m => m.role === 'leader')?.email}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-zinc-400">
-                                                        {team.members.find(m => m.role === 'leader')?.email}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            {team.city && (
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {team.city && (
+                                                    <span className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-sm font-semibold">
+                                                        {team.city}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
                                                 <span className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-sm font-semibold">
-                                                    {team.city}
+                                                    {team.members?.length || 0}
                                                 </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-sm font-semibold">
-                                                {team.members?.length || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => setViewTeam(team)}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 text-sm font-medium transition"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                                View
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => setViewTeam(team)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 text-sm font-medium transition"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                    View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                         {paginatedTeams.length === 0 && filteredTeams.length === 0 && (
@@ -405,12 +499,6 @@ export default function CheckInsPage() {
                                     </div>
                                 </div>
                                 <div className="p-6 border-t border-zinc-800 flex gap-3 justify-end">
-                                    {/* <button
-                                        onClick={() => setViewTeam(null)}
-                                        className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition"
-                                    >
-                                        Close
-                                    </button> */}
                                     <button
                                         onClick={async () => {
                                             if (!viewTeam) return;
@@ -428,7 +516,6 @@ export default function CheckInsPage() {
                                         }}
                                         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition"
                                     >
-                                        {/* <Star className="w-4 h-4" /> */}
                                         Mark as semi-finalist
                                     </button>
                                     <button
@@ -456,6 +543,38 @@ export default function CheckInsPage() {
                     </div>
                 </>
             )}
+
+            {/* Floating action bar — appears when teams are selected */}
+            {selectedIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl px-5 py-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+                    <span className="text-white font-semibold text-sm">
+                        {selectedIds.size} team{selectedIds.size !== 1 ? 's' : ''} selected
+                    </span>
+                    <div className="w-px h-5 bg-zinc-700" />
+                    <button
+                        onClick={() => setCertModalOpen(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm transition-all"
+                    >
+                        <Award className="w-4 h-4" />
+                        Send Certificate
+                    </button>
+                    <button
+                        onClick={clearSelection}
+                        className="text-zinc-400 hover:text-white transition p-1"
+                        title="Clear selection"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
+            <CertificateSendModal
+                isOpen={certModalOpen}
+                onClose={() => setCertModalOpen(false)}
+                selectedTeamIds={Array.from(selectedIds)}
+                certType="participant"
+                estimatedParticipants={estimatedParticipants}
+            />
         </div>
     );
 }

@@ -100,6 +100,8 @@ func main() {
 	ticketHandler := handlers.NewTicketHandler(ticketService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementService)
 	bulkEmailHandler := handlers.NewBulkEmailHandler(db.DB, emailService, announcementService)
+	certificateHandler := handlers.NewCertificateHandler(db.DB, emailService, cfg.APIPublicURL, cfg.FrontendURL)
+
 	eventTableHandler := handlers.NewEventTableHandler(eventTableService)
 	problemStatementHandler := handlers.NewProblemStatementHandler(problemStatementService)
 	checkPSHandler := handlers.NewCheckPSHandler(psSelectionService)
@@ -117,6 +119,9 @@ func main() {
 
 	// Global middleware
 	router.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
+
+	// Serve static font files (used by SVG certificates — same-origin avoids CORS issues)
+	router.Static("/static", "./static")
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -181,6 +186,12 @@ func main() {
 		v1.GET("/checkps", checkPSHandler.GetPSSelections)
 		// Judging: list all submissions with filters (city, problem_statement_id)
 		v1.GET("/judging/submissions", judgingHandler.GetSubmissions)
+		// Public certificate verification (no auth)
+		v1.GET("/certificates/verify/:cert_id", certificateHandler.VerifyCertificate)
+		// SVG certificate image (for display in browser/email)
+		v1.GET("/certificates/:cert_id/image.svg", certificateHandler.GetCertificateImageSVG)
+		// JPEG certificate image (for LinkedIn OG scraping — LinkedIn requires raster images)
+		v1.GET("/certificates/:cert_id/image.jpg", certificateHandler.GetCertificateImageJPEG)
 
 		// Public room view (seating layout + allocations by city and room name) — no auth
 		publicRoutes := v1.Group("/public")
@@ -284,6 +295,10 @@ func main() {
 			// Bulk Email
 			adminRoutes.POST("/send-bulk-email", bulkEmailHandler.SendBulkEmail)
 			adminRoutes.GET("/email-logs", bulkEmailHandler.GetEmailLogs)
+
+			// Certificates
+			adminRoutes.POST("/certificates/send", certificateHandler.SendCertificates)
+			adminRoutes.POST("/certificates/send-manual", certificateHandler.SendManualCertificate)
 
 			// Stats
 			adminRoutes.GET("/stats/checkin", adminHandler.GetCheckInStats)

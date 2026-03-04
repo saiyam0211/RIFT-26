@@ -28,7 +28,9 @@ type Config struct {
 	SMTPFromEmail string
 	SMTPFromName  string
 	// API public URL for building download links (e.g. https://api.example.com)
-	APIPublicURL string
+	APIPublicURL  string
+	// Frontend public URL for building verify links (e.g. https://rift.pwioi.com)
+	FrontendURL   string
 }
 
 func Load() (*Config, error) {
@@ -55,7 +57,8 @@ func Load() (*Config, error) {
 		SMTPPassword:  getEnv("SMTP_PASSWORD", ""),
 		SMTPFromEmail: getEnv("SMTP_FROM_EMAIL", "rift_support@pwioi.com"),
 		SMTPFromName:  getEnv("SMTP_FROM_NAME", "RIFT '26 Support"),
-		APIPublicURL:  getEnv("API_PUBLIC_URL", "http://localhost:8080"),
+		APIPublicURL:  getEnv("API_PUBLIC_URL", "http://localhost:9000"),
+		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:3000"),
 	}, nil
 }
 

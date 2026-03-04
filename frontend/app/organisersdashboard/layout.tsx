@@ -16,7 +16,8 @@ import {
     MapPin,
     ShieldCheck,
     FileText,
-    CheckCircle
+    CheckCircle,
+    Award
 } from 'lucide-react';
 import { getAdminToken, getAdminUser, removeAdminToken } from '../../src/lib/admin-auth';
 
@@ -50,6 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Teams', path: '/organisersdashboard/teams', icon: Users },
         { name: 'Check-ins', path: '/organisersdashboard/checkins', icon: CheckCircle },
         { name: 'Semi Finalists', path: '/organisersdashboard/semi-finalists', icon: CheckCircle },
+        { name: 'Certificates', path: '/organisersdashboard/certificates', icon: Award },
         { name: 'Volunteers', path: '/organisersdashboard/volunteers', icon: Users },
         { name: 'Tables', path: '/organisersdashboard/tables', icon: Table },
         { name: 'Problem Statements', path: '/organisersdashboard/problem-statements', icon: FileText },

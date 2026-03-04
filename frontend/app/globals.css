@@ -13,10 +13,20 @@
   font-display: swap;
 }
 
+/* Custom Font - BRITTANY */
+@font-face {
+  font-family: 'BRITTANY';
+  src: url('./fonts/Brittany.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Tailwind v4 CSS-first configuration */
 @theme {
   --font-family: Inter, system-ui, sans-serif;
   --font-tan: 'TANBUSTER';
+  --font-brittany: 'BRITTANY';
 
   --color-background: #ffffff;
   --color-foreground: #171717;

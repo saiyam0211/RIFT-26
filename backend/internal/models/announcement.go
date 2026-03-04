@@ -7,17 +7,17 @@ import (
 )
 
 type Announcement struct {
-	ID        uuid.UUID  `json:"id" db:"id"`
-	Title     string     `json:"title" db:"title"`
-	Content   string     `json:"content" db:"content"`
-	Priority  int        `json:"priority" db:"priority"`
-	IsActive  bool       `json:"is_active" db:"is_active"`
-	ButtonText *string   `json:"button_text,omitempty" db:"button_text"`
-	ButtonURL  *string   `json:"button_url,omitempty" db:"button_url"`
-	Filters   []byte     `json:"filters,omitempty" db:"filters"` // JSONB
-	CreatedBy *uuid.UUID `json:"created_by" db:"created_by"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at" db:"updated_at"`
+	ID         uuid.UUID  `json:"id" db:"id"`
+	Title      string     `json:"title" db:"title"`
+	Content    string     `json:"content" db:"content"`
+	Priority   int        `json:"priority" db:"priority"`
+	IsActive   bool       `json:"is_active" db:"is_active"`
+	ButtonText *string    `json:"button_text,omitempty" db:"button_text"`
+	ButtonURL  *string    `json:"button_url,omitempty" db:"button_url"`
+	Filters    []byte     `json:"filters,omitempty" db:"filters"` // JSONB
+	CreatedBy  *uuid.UUID `json:"created_by" db:"created_by"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type ProblemStatement struct {
@@ -64,12 +64,12 @@ type SupportTicket struct {
 
 // Request DTOs
 type CreateAnnouncementRequest struct {
-	Title    string              `json:"title" binding:"required"`
-	Content  string              `json:"content" binding:"required"`
-	Priority int                 `json:"priority" binding:"min=0,max=10"`
-	ButtonText *string           `json:"button_text" binding:"omitempty"`
-	ButtonURL  *string           `json:"button_url" binding:"omitempty,url"`
-	Filters  AnnouncementFilters `json:"filters"`
+	Title      string              `json:"title" binding:"required"`
+	Content    string              `json:"content" binding:"required"`
+	Priority   int                 `json:"priority" binding:"min=0,max=10"`
+	ButtonText *string             `json:"button_text" binding:"omitempty"`
+	ButtonURL  *string             `json:"button_url" binding:"omitempty,url"`
+	Filters    AnnouncementFilters `json:"filters"`
 }
 
 type SubmitProjectRequest struct {
@@ -112,11 +112,11 @@ type ResolveTicketRequest struct {
 
 // Announcement filters for targeting
 type AnnouncementFilters struct {
-	TeamSizes            []int    `json:"team_sizes,omitempty"`
-	Cities               []string `json:"cities,omitempty"`
-	TeamIDs              []string `json:"team_ids,omitempty"`
-	OnlyRSVP1Done        bool     `json:"only_rsvp1_done,omitempty"`         // true = only teams with RSVP I done, RSVP II not done (status = rsvp_done)
-	OnlyShortlistedNoRSVP1 bool   `json:"only_shortlisted_no_rsvp1,omitempty"` // true = only teams shortlisted who haven't filled RSVP I (status = shortlisted)
+	TeamSizes              []int    `json:"team_sizes,omitempty"`
+	Cities                 []string `json:"cities,omitempty"`
+	TeamIDs                []string `json:"team_ids,omitempty"`
+	OnlyRSVP1Done          bool     `json:"only_rsvp1_done,omitempty"`           // true = only teams with RSVP I done, RSVP II not done (status = rsvp_done)
+	OnlyShortlistedNoRSVP1 bool     `json:"only_shortlisted_no_rsvp1,omitempty"` // true = only teams shortlisted who haven't filled RSVP I (status = shortlisted)
 }
 
 // Email log model
@@ -135,4 +135,30 @@ type SendEmailRequest struct {
 	Subject     string              `json:"subject" binding:"required,min=1,max=255"`
 	HTMLContent string              `json:"html_content" binding:"required"`
 	Filters     AnnouncementFilters `json:"filters"`
+}
+
+// Certificate models
+type Certificate struct {
+	ID               string    `json:"id"`
+	ParticipantName  string    `json:"participant_name"`
+	ParticipantEmail string    `json:"participant_email"`
+	TeamID           *string   `json:"team_id"`
+	TeamName         *string   `json:"team_name"`
+	CertType         string    `json:"cert_type"` // participant | semi_finalist | winner | volunteer | hod | custom
+	Position         *string   `json:"position"`  // e.g. "1st Place", "Head of Design"
+	IssuedAt         time.Time `json:"issued_at"`
+}
+
+type SendCertificatesRequest struct {
+	TeamIDs  []string `json:"team_ids" binding:"required,min=1"`
+	CertType string   `json:"cert_type" binding:"required,oneof=participant semi_finalist winner"`
+	Position string   `json:"position"` // required when cert_type=winner
+}
+
+type ManualCertificateRequest struct {
+	Name     string  `json:"name" binding:"required"`
+	Email    string  `json:"email" binding:"required,email"`
+	CertType string  `json:"cert_type" binding:"required,oneof=participant semi_finalist winner volunteer hod custom"`
+	TeamName *string `json:"team_name"` // required for participant/semi_finalist/winner
+	Position *string `json:"position"`  // required for winner/custom
 }

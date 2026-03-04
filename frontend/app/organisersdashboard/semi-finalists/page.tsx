@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { getAdminToken } from '../../../src/lib/admin-auth';
-import { Eye, Filter, Star } from 'lucide-react';
+import { Eye, Filter, Star, Award, CheckSquare, Square, MinusSquare, X } from 'lucide-react';
+import { CertificateSendModal } from '../../../components/CertificateSendModal';
 
 interface SemiFinalist {
   id: string;
@@ -29,9 +30,14 @@ export default function SemiFinalistsPage() {
   const [bestWeb3, setBestWeb3] = useState(false);
   const [savingAwards, setSavingAwards] = useState(false);
 
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [certModalType, setCertModalType] = useState<'semi_finalist' | 'winner' | null>(null);
+
   useEffect(() => {
     fetchSemiFinalists();
   }, []);
+
 
   const fetchSemiFinalists = async () => {
     try {
@@ -70,6 +76,34 @@ export default function SemiFinalistsPage() {
     const matchesPS = !filterPS || psLabel === filterPS;
     return matchesSearch && matchesCity && matchesPS;
   });
+
+  // ---- Selection helpers ----
+  // Semi-finalists only have team_id for sending certs
+  const toggleSelect = (teamId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(teamId)) next.delete(teamId);
+      else next.add(teamId);
+      return next;
+    });
+  };
+
+  const isPageAllSelected = filtered.length > 0 && filtered.every(i => selectedIds.has(i.team_id));
+  const isPagePartialSelected = filtered.some(i => selectedIds.has(i.team_id)) && !isPageAllSelected;
+
+  const toggleAllFiltered = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (isPageAllSelected) {
+        filtered.forEach(i => next.delete(i.team_id));
+      } else {
+        filtered.forEach(i => next.add(i.team_id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
 
   return (
     <div>
@@ -117,7 +151,7 @@ export default function SemiFinalistsPage() {
           <div className="flex items-center gap-2 text-sm text-zinc-400">
             <Filter className="w-4 h-4" />
             <span>Active filters:</span>
-            {searchQuery && <span className="text-white">Search “{searchQuery}”</span>}
+            {searchQuery && <span className="text-white">Search "{searchQuery}"</span>}
             {filterCity && <span className="text-white">City {filterCity}</span>}
             {filterPS && <span className="text-white">PS {filterPS}</span>}
             <button
@@ -130,6 +164,22 @@ export default function SemiFinalistsPage() {
         )}
       </div>
 
+      {/* Select-all banner */}
+      {selectedIds.size > 0 && !isPageAllSelected && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 mb-3 flex items-center justify-between text-sm">
+          <span className="text-amber-300">{selectedIds.size} team{selectedIds.size !== 1 ? 's' : ''} selected.</span>
+          <button onClick={toggleAllFiltered} className="text-amber-400 font-semibold hover:text-amber-300 underline">
+            Select all {filtered.length} filtered teams
+          </button>
+        </div>
+      )}
+      {isPageAllSelected && filtered.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 mb-3 flex items-center justify-between text-sm">
+          <span className="text-amber-300">All {filtered.length} teams selected.</span>
+          <button onClick={clearSelection} className="text-amber-400 font-semibold hover:text-amber-300 underline">Clear selection</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
@@ -140,6 +190,21 @@ export default function SemiFinalistsPage() {
           <table className="min-w-full divide-y divide-zinc-800">
             <thead className="bg-red-600 text-white">
               <tr>
+                <th className="px-4 py-3 w-10">
+                  <button
+                    onClick={toggleAllFiltered}
+                    className="flex items-center justify-center text-white hover:text-amber-200 transition"
+                    title={isPageAllSelected ? 'Deselect all' : 'Select all filtered'}
+                  >
+                    {isPageAllSelected ? (
+                      <CheckSquare className="w-5 h-5" />
+                    ) : isPagePartialSelected ? (
+                      <MinusSquare className="w-5 h-5 opacity-70" />
+                    ) : (
+                      <Square className="w-5 h-5 opacity-60" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Team Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">City</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Problem Statement</th>
@@ -148,58 +213,72 @@ export default function SemiFinalistsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {filtered.map((item, idx) => (
-                <tr key={item.id} className={`hover:bg-zinc-800 transition-colors ${idx % 2 === 0 ? 'bg-zinc-950' : 'bg-black'}`}>
-                  <td className="px-6 py-4 text-white font-medium">{item.team_name}</td>
-                  <td className="px-6 py-4 text-zinc-200">{item.team_city || '—'}</td>
-                  <td className="px-6 py-4">
-                    <div className="text-white font-medium">{item.ps_name}</div>
-                    <div className="text-zinc-400 text-sm mt-0.5">{item.ps_track}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {item.leader_name ? (
-                      <>
-                        <div className="text-white text-sm font-medium">{item.leader_name}</div>
-                        {item.leader_email && (
-                          <div className="text-zinc-400 text-xs truncate max-w-[220px]" title={item.leader_email}>
-                            {item.leader_email}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-zinc-500 text-sm">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {item.position && (
-                        <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold">
-                          {item.position} {item.position === 1 ? 'st' : item.position === 2 ? 'nd' : item.position === 3 ? 'rd' : 'th'}
-                        </span>
-                      )}
-                      {item.best_web3 && (
-                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold">
-                          Best Web3
-                        </span>
-                      )}
+              {filtered.map((item, idx) => {
+                const isSelected = selectedIds.has(item.team_id);
+                return (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-zinc-800 transition-colors ${isSelected ? 'bg-amber-500/5 border-l-2 border-amber-500' : idx % 2 === 0 ? 'bg-zinc-950' : 'bg-black'}`}
+                  >
+                    <td className="px-4 py-4">
                       <button
-                        onClick={() => {
-                          setSelected(item);
-                          setPositionInput(item.position ? String(item.position) : '');
-                          setBestWeb3(!!item.best_web3);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 text-xs font-medium transition"
+                        onClick={() => toggleSelect(item.team_id)}
+                        className={`flex items-center justify-center transition ${isSelected ? 'text-amber-400' : 'text-zinc-600 hover:text-zinc-400'}`}
                       >
-                        <Eye className="w-4 h-4" />
-                        View
+                        {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 text-white font-medium">{item.team_name}</td>
+                    <td className="px-6 py-4 text-zinc-200">{item.team_city || '—'}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-white font-medium">{item.ps_name}</div>
+                      <div className="text-zinc-400 text-sm mt-0.5">{item.ps_track}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.leader_name ? (
+                        <>
+                          <div className="text-white text-sm font-medium">{item.leader_name}</div>
+                          {item.leader_email && (
+                            <div className="text-zinc-400 text-xs truncate max-w-[220px]" title={item.leader_email}>
+                              {item.leader_email}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-zinc-500 text-sm">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {item.position && (
+                          <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold">
+                            {item.position}{item.position === 1 ? 'st' : item.position === 2 ? 'nd' : item.position === 3 ? 'rd' : 'th'}
+                          </span>
+                        )}
+                        {item.best_web3 && (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold">
+                            Best Web3
+                          </span>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelected(item);
+                            setPositionInput(item.position ? String(item.position) : '');
+                            setBestWeb3(!!item.best_web3);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 text-xs font-medium transition"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-zinc-400">
+                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-400">
                     No semi-finalists found for the selected filters.
                   </td>
                 </tr>
@@ -315,6 +394,46 @@ export default function SemiFinalistsPage() {
           </div>
         </div>
       )}
+
+      {/* Floating action bar – two cert options */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl px-5 py-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <span className="text-white font-semibold text-sm">
+            {selectedIds.size} team{selectedIds.size !== 1 ? 's' : ''} selected
+          </span>
+          <div className="w-px h-5 bg-zinc-700" />
+          <button
+            onClick={() => setCertModalType('semi_finalist')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-all"
+          >
+            <Award className="w-4 h-4" />
+            Semi-Finalist Certificate
+          </button>
+          <button
+            onClick={() => setCertModalType('winner')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm transition-all"
+          >
+            <Star className="w-4 h-4" />
+            Winner Certificate
+          </button>
+          <button
+            onClick={clearSelection}
+            className="text-zinc-400 hover:text-white transition p-1"
+            title="Clear selection"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <CertificateSendModal
+        isOpen={certModalType !== null}
+        onClose={() => setCertModalType(null)}
+        selectedTeamIds={Array.from(selectedIds)}
+        certType={certModalType || 'semi_finalist'}
+        estimatedParticipants={selectedIds.size * 4}
+        showPositionInput={certModalType === 'winner'}
+      />
     </div>
   );
 }

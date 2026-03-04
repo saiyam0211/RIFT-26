@@ -396,3 +396,130 @@ func (s *EmailService) SendMail(recipients []string, subject, htmlBody string) e
 	}
 	return nil
 }
+
+// SendCertificateEmail sends a unique, verifiable certificate email to a single participant.
+// The email includes a LinkedIn "Add to Profile" deep-link and a verify URL.
+func (s *EmailService) SendCertificateEmail(
+	toEmail, participantName, teamName, certType, certID string,
+	issuedAt string, // formatted date e.g. "February 2026"
+	verifyURL string,
+) error {
+	var certTitle, certDescription string
+	switch certType {
+	case "winner":
+		certTitle = "Winner"
+		certDescription = fmt.Sprintf("Won at RIFT '26 Hackathon, representing team <strong>%s</strong>.", teamName)
+	case "semi_finalist":
+		certTitle = "Semi-Finalist"
+		certDescription = fmt.Sprintf("Was a Semi-Finalist at RIFT '26 Hackathon, representing team <strong>%s</strong>.", teamName)
+	case "volunteer":
+		certTitle = "Volunteer"
+		certDescription = fmt.Sprintf("Served as a valued Volunteer at RIFT '26 Hackathon.")
+	case "hod":
+		certTitle = "Head of Department"
+		certDescription = fmt.Sprintf("Served as Head of Department at RIFT '26 Hackathon.")
+	case "custom":
+		certTitle = ""
+		certDescription = fmt.Sprintf("Contributed to RIFT '26 Hackathon.")
+	default:
+		certTitle = "Participant"
+		certDescription = fmt.Sprintf("Participated in RIFT '26 Hackathon as a member of team <strong>%s</strong>.", teamName)
+	}
+
+	// LinkedIn Add-to-Profile deep link (no API key required)
+	// https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=<cert>&organizationName=<org>&issueYear=&issueMonth=&certUrl=<url>&certId=<id>
+	// linkedinURL := fmt.Sprintf(
+	// 	"https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=%s&organizationName=RIFT+%%2726&issueYear=2026&issueMonth=2&certUrl=%s&certId=%s",
+	// 	strings.ReplaceAll(certTitle, " ", "+"),
+	// 	strings.ReplaceAll(verifyURL, "://", "%%3A%%2F%%2F"),
+	// 	certID,
+	// )
+
+	subject := fmt.Sprintf("Your %s Certificate – RIFT '26 Hackathon", certTitle)
+
+	body := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>%s</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#111111;border-radius:16px;overflow:hidden;border:1px solid #222;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#c0211f 0%%,#8b0000 100%%);padding:36px 40px;text-align:center;">
+            <p style="margin:0 0 8px;color:rgba(255,255,255,0.7);font-size:13px;letter-spacing:3px;text-transform:uppercase;">RIFT '26 Hackathon</p>
+            <h1 style="margin:0;color:#fff;font-size:30px;font-weight:800;letter-spacing:1px;">%s</h1>
+          </td>
+        </tr>
+
+        <!-- Certificate Body -->
+        <tr>
+          <td style="padding:40px;">
+            <!-- Decorative cert card -->
+            <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:32px;">
+              <tr>
+                <td style="border-top:3px solid #c0211f;padding:32px;text-align:center;">
+                  <p style="margin:0 0 6px;color:#888;font-size:18px;text-transform:uppercase;letter-spacing:2px;">This is to certify that</p>
+                  <h2 style="margin:12px 0;color:#fff;font-size:28px;font-weight:800;">%s</h2>
+                  <p style="margin:0;color:#aaa;font-size:15px;line-height:1.6;">%s</p>
+                  <div style="margin:24px auto 0;width:80px;height:2px;background:linear-gradient(90deg,transparent,#c0211f,transparent);"></div>
+                  <p style="margin:20px 0 0;color:#666;font-size:13px;">Issued: %s</p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Cert ID -->
+            <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="background:#161616;border:1px solid #222;border-radius:10px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:18px 24px;">
+                  <p style="margin:0 0 4px;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">Certificate ID</p>
+                  <p style="margin:0;color:#e0e0e0;font-size:13px;font-family:monospace;word-break:break-all;">%s</p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Verify link -->
+            <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
+              <tr>
+                <td align="center">
+                  <a href="%s"
+                     style="display:inline-block;background:transparent;color:#c0211f;text-decoration:none;
+                            padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;
+                            border:1px solid #c0211f;">
+                    Open Certificate
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#0d0d0d;border-top:1px solid #1f1f1f;padding:24px 40px;text-align:center;">
+            <p style="margin:0;color:#444;font-size:12px;">© 2026 RIFT Hackathon · All Rights Reserved</p>
+            <p style="margin:6px 0 0;color:#333;font-size:11px;">This certificate is unique to the recipient and can be verified at the link above.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		certTitle,       // page title
+		certTitle,       // email header h1
+		participantName, // "This is to certify that"
+		certDescription, // description paragraph
+		issuedAt,        // issued date
+		certID,          // cert ID box
+		verifyURL,       // Verify href
+	)
+
+	return s.sendEmail(toEmail, subject, body)
+}
